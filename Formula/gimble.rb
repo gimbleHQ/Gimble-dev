@@ -9,12 +9,6 @@ class Gimble < Formula
 
   def install
     system "go", "build", "-ldflags", "-X main.version=0.1.2", "-o", bin/"gimble", "./cmd/gimble"
-
-    (bin/"Gimble").write <<~SH
-      #!/bin/sh
-      exec "#{bin}/gimble" "$@"
-    SH
-    chmod 0755, bin/"Gimble"
   end
 
   test do
