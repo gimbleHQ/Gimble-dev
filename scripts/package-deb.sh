@@ -25,6 +25,7 @@ rm -rf "$PKG_ROOT"
 mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin"
 
 install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/${APP}"
+ln -sf "${APP}" "$PKG_ROOT/usr/bin/Gimble"
 
 cat > "$PKG_ROOT/DEBIAN/control" <<CONTROL
 Package: ${APP}
