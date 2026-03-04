@@ -112,7 +112,9 @@ func runChat(args []string) error {
 	})
 
 	url := fmt.Sprintf("http://localhost:%d", actualPort)
-	fmt.Printf("Gimble chat UI: %s\n", url)
+	// Print an OSC 8 hyperlink where supported, with the plain URL as a fallback.
+	// OSC 8 sequence: ESC ] 8 ; ; <url> ESC \\ <text> ESC ] 8 ; ; ESC \\
+	fmt.Printf("Gimble chat UI: %s\n", makeHyperlink(url)+" ("+url+")")
 	fmt.Println("Open this URL in your browser. Press Ctrl+C to stop.")
 
 	server := &http.Server{Handler: mux}
@@ -146,6 +148,13 @@ func fsReadFile(fsys fs.FS, name string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// makeHyperlink returns an OSC 8 hyperlink sequence for terminals that support it.
+// The returned string will display the URL as clickable text when supported.
+func makeHyperlink(url string) string {
+	// ESC ] 8 ; ; <url> ESC \ <text> ESC ] 8 ; ; ESC \
+	return "\x1b]8;;" + url + "\x1b\\" + url + "\x1b]8;;\x1b\\"
 }
 
 func runProfile(args []string) error {
