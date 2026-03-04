@@ -59,13 +59,11 @@ A workflow is included at `.github/workflows/publish-apt.yml`.
 
 ## User install commands (`sudo apt install gimble`)
 
-Replace `<OWNER>` and `<REPO>` with your GitHub org/user and repo.
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/gh-pages/gimble-archive-keyring.gpg \
+curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/gh-pages/gimble-archive-keyring.gpg \
   | sudo tee /usr/share/keyrings/gimble-archive-keyring.gpg >/dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/gimble-archive-keyring.gpg] https://<OWNER>.github.io/<REPO> stable main" \
+echo "deb [signed-by=/usr/share/keyrings/gimble-archive-keyring.gpg] https://saketspradhan.github.io/Gimble-dev stable main" \
   | sudo tee /etc/apt/sources.list.d/gimble.list >/dev/null
 
 sudo apt update
