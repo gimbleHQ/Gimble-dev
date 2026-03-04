@@ -1,19 +1,25 @@
 # Gimble
 
-Gimble is a cross-platform CLI that supports:
+Gimble is a cross-platform CLI for Linux and macOS.
 
-- Linux (`amd64`, `arm64`)
-- macOS (`amd64`, `arm64`)
+## Install
 
-On Linux, Gimble is distributed via APT so users can install with:
+### macOS (Homebrew)
 
 ```bash
-sudo apt install gimble
+brew tap saketspradhan/gimble https://github.com/Saketspradhan/Gimble-dev
+brew install gimble
 ```
 
-## Quick install (Linux via APT)
+Start Gimble:
 
-One-time setup:
+```bash
+gimble
+```
+
+### Linux (APT)
+
+One-time repository setup:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/gh-pages/gimble-archive-keyring.gpg \
@@ -21,62 +27,48 @@ curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/gh-pages/g
 
 echo "deb [signed-by=/usr/share/keyrings/gimble-archive-keyring.gpg] https://saketspradhan.github.io/Gimble-dev stable main" \
   | sudo tee /etc/apt/sources.list.d/gimble.list >/dev/null
+```
 
+Install:
+
+```bash
 sudo apt update
 sudo apt install gimble
 ```
 
-Start a Gimble session:
+Start Gimble:
 
 ```bash
 Gimble
 ```
 
-Type `exit` to return to your previous shell.
+## First Run (Recommended)
 
-## Install with Homebrew (macOS)
-
-You can install Gimble directly from this repository as a tap:
+Initialize your profile once:
 
 ```bash
-brew tap saketspradhan/gimble https://github.com/Saketspradhan/Gimble-dev
-brew install gimble
+gimble profile init \
+  --name "Your Name" \
+  --email "you@example.com" \
+  --github "your-github"
 ```
 
-Then start a session with:
+Then open a session anytime:
 
 ```bash
 gimble
 ```
 
-## What happens when you run Gimble
+Type `exit` to return to your normal shell.
 
-After install, both commands are available:
+## Profile and Config Management
 
-- `gimble`
-- `Gimble`
-
-Running either command opens a child interactive shell session in the current terminal, with a Gimble prompt prefix. This behaves similarly to tools that open a scoped shell session. Use `exit` to leave.
-
-## Profile and config management
-
-Gimble supports local user profiles (like git-style identity config).
-
-### Config file location
+Gimble stores profile config at:
 
 - Linux: `~/.config/gimble/config.json`
 - macOS: `~/Library/Application Support/gimble/config.json`
 
-### Create your first profile
-
-```bash
-gimble profile init \
-  --name "Saket Pradhan" \
-  --email "saketp@umich.edu" \
-  --github "Saketspradhan"
-```
-
-### Manage profiles
+Useful profile commands:
 
 ```bash
 gimble profile list
@@ -86,22 +78,20 @@ gimble profile use default
 gimble profile delete oldprofile
 ```
 
-When a profile is active and you enter Gimble, these env vars are available in-session:
+Inside a Gimble session, active profile data is exported as:
 
 - `GIMBLE_PROFILE`
 - `GIMBLE_USER_NAME`
 - `GIMBLE_USER_EMAIL`
 - `GIMBLE_USER_GITHUB`
 
-## Build from source
-
-Build local binary:
+## Build from Source
 
 ```bash
 make build
 ```
 
-Build release binaries:
+Release binaries:
 
 ```bash
 make build-linux
@@ -110,7 +100,7 @@ make build-macos
 
 Artifacts are written to `dist/`.
 
-## Build Debian packages locally
+## Build Debian Packages Locally
 
 ```bash
 make package-deb VERSION=0.1.0
@@ -121,13 +111,13 @@ This creates:
 - `dist/gimble_0.1.0_amd64.deb`
 - `dist/gimble_0.1.0_arm64.deb`
 
-## Release and publish workflow (maintainer)
+## Release and Publish Workflow (Maintainer)
 
 Workflow file:
 
 - `.github/workflows/publish-apt.yml`
 
-On tag push (`v*`), workflow does all of this:
+On tag push (`v*`), the workflow:
 
 1. Builds Linux binaries and `.deb` packages.
 2. Generates APT repo metadata (`dists/stable`, `pool/`).
@@ -135,7 +125,7 @@ On tag push (`v*`), workflow does all of this:
 4. Publishes APT repository to `gh-pages`.
 5. Creates GitHub Release and uploads `.deb` artifacts.
 
-### Required GitHub Actions secrets
+Required GitHub Actions secrets:
 
 - `APT_GPG_PRIVATE_KEY_B64`
 - `APT_GPG_KEY_ID`
@@ -145,18 +135,27 @@ Key setup details:
 
 - `scripts/apt/KEY_SETUP.md`
 
-### Publish a release
+Publish a release:
 
 ```bash
 git tag v0.1.2
 git push origin v0.1.2
 ```
 
-## Updating Gimble (users)
+## Updating Gimble
+
+### Linux
 
 ```bash
 sudo apt update
 sudo apt upgrade gimble
+```
+
+### macOS
+
+```bash
+brew update
+brew upgrade gimble
 ```
 
 ## Troubleshooting
