@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gimble Chat</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --sidebar: #0c0d10;
+      --surface: #111318;
+      --surface-2: #1a1d23;
+      --text: #eceff3;
+      --muted: #9aa1ac;
+      --line: #2a2f38;
+      --accent: #10a37f;
+      --danger: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .app {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      background: var(--sidebar);
+      border-right: 1px solid var(--line);
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+
+    .new-chat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 14px;
+      color: var(--muted);
+      background: transparent;
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .history {
+      overflow: auto;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .history-item {
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      padding: 10px;
+      font-size: 13px;
+      color: var(--text);
+      background: #12151b;
+    }
+
+    .profile {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: 56px 1fr auto;
+      min-width: 0;
+      height: 100%;
+    }
+
+    .topbar {
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 17, 21, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      gap: 12px;
+    }
+
+    .title { font-weight: 600; }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .model {
+      border: 1px solid var(--line);
+      background: #13161c;
+      color: var(--text);
+      border-radius: 8px;
+      height: 30px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 70px;
+      text-align: right;
+    }
+
+    .messages {
+      overflow: auto;
+      padding: 22px 0 28px;
+    }
+
+    .message-wrap {
+      width: min(900px, calc(100% - 24px));
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .avatar.user { background: #394252; color: #fff; }
+    .avatar.assistant { background: var(--accent); color: #073c30; }
+
+    .bubble {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+      line-height: 1.55;
+      font-size: 15px;
+      background: var(--surface);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .bubble.assistant { background: var(--surface-2); }
+    .bubble.error { border-color: var(--danger); color: #ffd7d7; }
+
+    .composer-wrap {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+      background: rgba(15, 17, 21, 0.94);
+    }
+
+    .composer {
+      width: min(900px, calc(100% - 24px));
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #12141a;
+      display: grid;
+      grid-template-columns: 1fr 40px;
+      gap: 8px;
+      align-items: end;
+      padding: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 28px;
+      max-height: 180px;
+      resize: none;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    .send {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 0;
+      background: #2f3642;
+      color: #dbe2ea;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .send:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .footnote {
+      width: min(900px, calc(100% - 24px));
+      margin: 8px auto 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <button class="new-chat" aria-disabled="true">+ New chat (disabled)</button>
+      <div class="history">
+        <div class="history-item">Single session chat</div>
+      </div>
+      <div class="profile">Gimble local chat</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title">Gimble Chat</div>
+        <div class="top-controls">
+          <select id="model" class="model"></select>
+          <div id="status" class="status">Ready</div>
+        </div>
+      </header>
+
+      <section class="messages" id="messages">
+        <div class="message-wrap" id="messageWrap">
+          <div class="row">
+            <div class="avatar assistant">G</div>
+            <div class="bubble assistant">Hi. I’m ready. Ask me anything.</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer-wrap">
+        <div class="composer">
+          <textarea id="input" placeholder="Message Gimble"></textarea>
+          <button id="send" class="send">↑</button>
+        </div>
+        <div class="footnote">Default: LLaMA local model. Switch models from the top-right dropdown.</div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const messageWrap = document.getElementById('messageWrap');
+    const messages = document.getElementById('messages');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+    const statusEl = document.getElementById('status');
+    const modelEl = document.getElementById('model');
+
+    let activeModel = 'llama';
+
+    function appendMessage(role, text, isError = false) {
+      const row = document.createElement('div');
+      row.className = 'row';
+
+      const avatar = document.createElement('div');
+      avatar.className = `avatar ${role}`;
+      avatar.textContent = role === 'user' ? 'U' : 'G';
+
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${role === 'assistant' ? 'assistant' : ''} ${isError ? 'error' : ''}`.trim();
+      bubble.textContent = text;
+
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      messageWrap.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
+      return bubble;
+    }
+
+    function setBusy(busy) {
+      send.disabled = busy;
+      input.disabled = busy;
+      modelEl.disabled = busy;
+      statusEl.textContent = busy ? 'Thinking...' : 'Ready';
+    }
+
+    async function loadModels() {
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        const defaultKey = data.default || 'llama';
+        modelEl.innerHTML = '';
+
+        for (const m of data.models || []) {
+          const opt = document.createElement('option');
+          opt.value = m.key;
+          opt.textContent = m.available ? m.label : `${m.label} (unavailable)`;
+          opt.disabled = !m.available;
+          if (m.key === defaultKey && m.available) {
+            opt.selected = true;
+            activeModel = m.key;
+          }
+          modelEl.appendChild(opt);
+        }
+
+        if (!modelEl.value) {
+          const first = [...modelEl.options].find(o => !o.disabled);
+          if (first) {
+            first.selected = true;
+            activeModel = first.value;
+          }
+        }
+
+        modelEl.addEventListener('change', () => {
+          activeModel = modelEl.value;
+        });
+      } catch (err) {
+        appendMessage('assistant', `Failed loading model list: ${err.message}`, true);
+      }
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage('user', text);
+      input.value = '';
+      setBusy(true);
+
+      const typing = appendMessage('assistant', '...');
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, model: activeModel })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          typing.className = 'bubble assistant error';
+          typing.textContent = data.error || `Request failed (${res.status})`;
+        } else {
+          typing.className = 'bubble assistant';
+          typing.textContent = data.reply || '(empty response)';
+        }
+      } catch (err) {
+        typing.className = 'bubble assistant error';
+        typing.textContent = `Network error: ${err.message}`;
+      } finally {
+        setBusy(false);
+        input.focus();
+      }
+    }
+
+    send.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    loadModels();
+  </script>
+</body>
+</html>

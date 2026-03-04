@@ -44,18 +44,25 @@ gimble
 
 ## Local Chat (inside Gimble session)
 
-`gim chat` now supports real OpenAI responses, but only inside a Gimble session.
+`gim chat` now runs a **Python** backend and supports model switching in the browser:
 
-### Option A: env vars in current shell
+- `LLaMA 3 7B (Local CPU)` (default)
+- `GPT-4 (OpenAI API)`
+
+### 1. Install the Gimble Python runtime (one-time)
+
+From the repo root:
 
 ```bash
-export OPENAI_API_KEY="<your_local_key>"
-export OPENAI_MODEL="gpt-4o-mini"   # optional
+./python/setup_runtime.sh
 ```
 
-### Option B: local config file (recommended)
+This creates a dedicated virtualenv:
 
-Create a machine-local file (never committed):
+- macOS: `~/Library/Application Support/gimble/pyenv`
+- Linux: `~/.config/gimble/pyenv`
+
+### 2. Configure OpenAI key (optional, for GPT-4 option)
 
 ```bash
 mkdir -p "$HOME/Library/Application Support/gimble"   # macOS
@@ -63,19 +70,11 @@ mkdir -p "$HOME/Library/Application Support/gimble"   # macOS
 
 cat > "$HOME/Library/Application Support/gimble/chat.env" <<'ENV'
 OPENAI_API_KEY=<your_local_key>
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4
 ENV
 ```
 
-Behavior:
-
-- Prefers `http://localhost:5555`
-- If `5555` is busy, Gimble picks any free localhost port
-- Prints a localhost link in terminal (click to open browser)
-- Serves one chat window and one in-memory conversation per server run
-- `new chat` is disabled intentionally
-
-Usage:
+### 3. Start chat
 
 ```bash
 gimble
@@ -83,6 +82,15 @@ gimble
 
 gim chat
 ```
+
+Behavior:
+
+- Default model in UI is local LLaMA
+- LLaMA model file is auto-downloaded on first local use (GGUF quantized CPU-friendly build)
+- If port `5555` is busy, Gimble uses another free localhost port
+- Single-window, single-session conversation UI (new chat disabled)
+
+Model selection happens in the top-right dropdown in the browser UI.
 
 `gimble chat` is intentionally disabled outside session.
 

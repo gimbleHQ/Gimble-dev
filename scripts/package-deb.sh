@@ -22,10 +22,11 @@ fi
 
 PKG_ROOT=".pkg/${APP}_${VERSION}_${ARCH}"
 rm -rf "$PKG_ROOT"
-mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin"
+mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin" "$PKG_ROOT/usr/share/gimble"
 
 install -m 0755 "$BIN_PATH" "$PKG_ROOT/usr/bin/${APP}"
 ln -sf "${APP}" "$PKG_ROOT/usr/bin/Gimble"
+cp -R python "$PKG_ROOT/usr/share/gimble/"
 
 cat > "$PKG_ROOT/DEBIAN/control" <<CONTROL
 Package: ${APP}

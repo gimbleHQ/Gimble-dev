@@ -1,31 +1,21 @@
 package main
 
 import (
-	"bufio"
-	"context"
-	"embed"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
-	chatservice "github.com/gimble-dev/gimble/internal/chat"
 	"github.com/gimble-dev/gimble/internal/platform"
 	"github.com/gimble-dev/gimble/internal/profile"
 )
 
 var version = "dev"
-
-//go:embed web/chat/index.html
-var chatAssets embed.FS
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -80,160 +70,103 @@ func runSessionCommand(args []string) error {
 
 	switch args[0] {
 	case "chat":
-		return runChat(args[1:])
+		return runPythonChat(args[1:])
 	default:
 		return fmt.Errorf("unknown session command %q", args[0])
 	}
 }
 
-func runChat(args []string) error {
+func runPythonChat(args []string) error {
 	fs := flag.NewFlagSet("chat", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	port := fs.Int("port", 5555, "preferred port")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-
 	if *port < 0 || *port > 65535 {
 		return fmt.Errorf("invalid port: %d", *port)
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
-	model := strings.TrimSpace(os.Getenv("OPENAI_MODEL"))
-	if apiKey == "" || model == "" {
-		fileKey, fileModel, err := loadLocalChatEnv()
-		if err != nil {
-			return err
-		}
-		if apiKey == "" {
-			apiKey = fileKey
-		}
-		if model == "" {
-			model = fileModel
-		}
-	}
-	if apiKey == "" {
-		path, _ := localChatEnvPath()
-		return fmt.Errorf("OPENAI_API_KEY is not set. Export it locally or set it in %s", path)
+	pythonExe, err := findPythonInterpreter()
+	if err != nil {
+		return err
 	}
 
-	svc := chatservice.NewService(apiKey, model)
+	scriptPath, err := findPythonChatServerScript()
+	if err != nil {
+		return err
+	}
 
 	ln, actualPort, err := listenWithFallback(*port)
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
-
-	indexBytes, err := fsReadFile(chatAssets, "web/chat/index.html")
-	if err != nil {
-		return fmt.Errorf("failed to load chat UI: %w", err)
-	}
-
-	type chatReq struct {
-		Message string `json:"message"`
-	}
-	type chatResp struct {
-		Reply string `json:"reply,omitempty"`
-		Error string `json:"error,omitempty"`
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(indexBytes)
-	})
-	mux.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		defer r.Body.Close()
-
-		var req chatReq
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(chatResp{Error: "invalid request body"})
-			return
-		}
-
-		reply, err := svc.Send(context.Background(), req.Message)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadGateway)
-			_ = json.NewEncoder(w).Encode(chatResp{Error: err.Error()})
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(chatResp{Reply: reply})
-	})
+	_ = ln.Close()
 
 	url := fmt.Sprintf("http://localhost:%d", actualPort)
 	fmt.Printf("Gimble chat UI: %s\n", makeHyperlink(url)+" ("+url+")")
 	fmt.Println("Open this URL in your browser. Press Ctrl+C to stop.")
 
-	server := &http.Server{Handler: mux}
-	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("chat server error: %w", err)
+	cmd := exec.Command(pythonExe, scriptPath, "--port", strconv.Itoa(actualPort))
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("python chat server failed: %w", err)
 	}
 
 	return nil
 }
 
-func localChatEnvPath() (string, error) {
-	cfgDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to determine config dir: %w", err)
+func findPythonInterpreter() (string, error) {
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		venvCandidates := []string{
+			filepath.Join(home, "Library", "Application Support", "gimble", "pyenv", "bin", "python3"),
+			filepath.Join(home, ".config", "gimble", "pyenv", "bin", "python3"),
+		}
+		for _, p := range venvCandidates {
+			if _, err := os.Stat(p); err == nil {
+				return p, nil
+			}
+		}
 	}
-	return filepath.Join(cfgDir, "gimble", "chat.env"), nil
+
+	for _, candidate := range []string{"python3", "python"} {
+		if p, err := exec.LookPath(candidate); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("python not found. Install Python 3 and retry")
 }
 
-func loadLocalChatEnv() (apiKey string, model string, err error) {
-	path, err := localChatEnvPath()
-	if err != nil {
-		return "", "", err
+func findPythonChatServerScript() (string, error) {
+	if explicit := strings.TrimSpace(os.Getenv("GIMBLE_CHAT_SERVER")); explicit != "" {
+		if _, err := os.Stat(explicit); err == nil {
+			return explicit, nil
+		}
+		return "", fmt.Errorf("GIMBLE_CHAT_SERVER points to a missing file: %s", explicit)
 	}
 
-	f, err := os.Open(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", "", nil
-		}
-		return "", "", fmt.Errorf("failed to read %s: %w", path, err)
-	}
-	defer f.Close()
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if strings.HasPrefix(line, "export ") {
-			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		val := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-		switch key {
-		case "OPENAI_API_KEY":
-			apiKey = val
-		case "OPENAI_MODEL":
-			model = val
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", "", fmt.Errorf("failed to parse %s: %w", path, err)
+	candidates := []string{
+		filepath.Join("python", "chat_server.py"),
+		filepath.Join(exeDir, "..", "share", "gimble", "python", "chat_server.py"),
+		filepath.Join(exeDir, "python", "chat_server.py"),
+		filepath.Join(exeDir, "..", "python", "chat_server.py"),
 	}
 
-	return apiKey, model, nil
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not locate python chat server. expected one of: %s", strings.Join(candidates, ", "))
 }
 
 func listenWithFallback(preferredPort int) (net.Listener, int, error) {
@@ -251,14 +184,6 @@ func listenWithFallback(preferredPort int) (net.Listener, int, error) {
 	}
 	actual := ln.Addr().(*net.TCPAddr).Port
 	return ln, actual, nil
-}
-
-func fsReadFile(fsys fs.FS, name string) ([]byte, error) {
-	data, err := fs.ReadFile(fsys, name)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 // makeHyperlink returns an OSC 8 hyperlink sequence for terminals that support it.

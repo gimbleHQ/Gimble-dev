@@ -30,3 +30,7 @@ profile.cov
 # .idea/
 # .vscode/
 /gimble
+
+# Python
+__pycache__/
+*.pyc

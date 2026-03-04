@@ -7,9 +7,11 @@ class Gimble < Formula
   license "MIT"
 
   depends_on "go" => :build
+  depends_on "python@3.12"
 
   def install
     system "go", "build", "-ldflags", "-X main.version=0.1.6", "-o", bin/"gimble", "./cmd/gimble"
+    pkgshare.install "python"
   end
 
   test do
