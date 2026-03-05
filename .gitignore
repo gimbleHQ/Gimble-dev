@@ -34,3 +34,6 @@ profile.cov
 # Python
 __pycache__/
 *.pyc
+
+# local chat secrets
+chat.env

@@ -14,9 +14,10 @@ const appDir = "gimble"
 const configFile = "config.json"
 
 type Profile struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	GitHub string `json:"github"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	GitHub   string `json:"github"`
+	Provider string `json:"provider,omitempty"`
 }
 
 type Config struct {
@@ -92,6 +93,14 @@ func NormalizeProfileName(v string) string {
 func NormalizeGitHub(v string) string {
 	v = strings.TrimSpace(v)
 	return strings.TrimPrefix(v, "@")
+}
+
+func NormalizeProvider(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v == "gitlab" {
+		return "gitlab"
+	}
+	return "github"
 }
 
 func ValidateEmail(v string) error {

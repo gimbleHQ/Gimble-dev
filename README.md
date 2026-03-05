@@ -74,7 +74,11 @@ From the repo root:
 ./python/setup_runtime.sh
 ```
 
-### 2. Configure local API keys
+### 2. Configure API keys
+
+Recommended: run `gimble setup` and paste keys during the wizard.
+
+Manual (optional):
 
 ```bash
 mkdir -p "$HOME/Library/Application Support/gimble"   # macOS
@@ -87,6 +91,11 @@ OPENAI_API_KEY=<your_openai_key>
 OPENAI_MODEL=gpt-4o-mini
 ENV
 ```
+
+Get keys from:
+
+- OpenAI: https://platform.openai.com/api-keys
+- Groq: https://console.groq.com/keys
 
 ### 3. Start chat
 
@@ -113,24 +122,34 @@ A `System: ...` prompt is persisted per selected model session and honored for f
 
 `gimble chat` is intentionally disabled outside session.
 
-## First Run (Recommended)
+## First Run (Setup Wizard)
 
-Initialize your profile once:
-
-```bash
-gimble profile init \
-  --name "Your Name" \
-  --email "you@example.com" \
-  --github "your-github"
-```
-
-Then open a session anytime:
+On first launch, Gimble automatically starts an interactive setup wizard:
 
 ```bash
 gimble
 ```
 
-Type `exit` to return to your normal shell.
+You can run it manually anytime:
+
+```bash
+gimble setup
+```
+
+The wizard walks through:
+
+- Name and email
+- Account provider: GitHub or GitLab
+- Account username
+- OpenAI API key (optional; can skip)
+- Groq API key (optional; can skip)
+
+Keys are written only to your local `chat.env` file with `0600` permissions:
+
+- Linux: `~/.config/gimble/chat.env`
+- macOS: `~/Library/Application Support/gimble/chat.env`
+
+Gimble does not push these keys to GitHub or transmit them outside your local runtime.
 
 ## Profile and Config Management
 
@@ -155,6 +174,7 @@ Inside a Gimble session, active profile data is exported as:
 - `GIMBLE_USER_NAME`
 - `GIMBLE_USER_EMAIL`
 - `GIMBLE_USER_GITHUB`
+- `GIMBLE_USER_ACCOUNT_PROVIDER`
 
 ## Build from Source
 
@@ -209,8 +229,8 @@ Key setup details:
 Publish a release:
 
 ```bash
-git tag v0.1.11
-git push origin v0.1.11
+git tag v0.1.12
+git push origin v0.1.12
 ```
 
 ## Updating Gimble

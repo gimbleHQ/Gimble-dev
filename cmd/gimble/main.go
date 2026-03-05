@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -9,9 +11,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gimble-dev/gimble/internal/platform"
 	"github.com/gimble-dev/gimble/internal/profile"
@@ -38,6 +42,9 @@ func run(args []string) error {
 	}
 
 	if len(args) == 0 {
+		if err := maybeRunFirstTimeSetup(); err != nil {
+			return err
+		}
 		return runSession()
 	}
 
@@ -54,7 +61,12 @@ func run(args []string) error {
 		if inSession {
 			return fmt.Errorf("already inside a Gimble session; use 'exit' to leave")
 		}
+		if err := maybeRunFirstTimeSetup(); err != nil {
+			return err
+		}
 		return runSession()
+	case "setup":
+		return runSetupWizard()
 	case "profile":
 		return runProfile(args[1:])
 	default:
@@ -87,6 +99,9 @@ func runPythonChat(args []string) error {
 	}
 	if *port < 0 || *port > 65535 {
 		return fmt.Errorf("invalid port: %d", *port)
+	}
+	if err := stopPreviousChatServer(); err != nil {
+		return err
 	}
 
 	pythonExe, err := findPythonInterpreter()
@@ -124,11 +139,100 @@ func runPythonChat(args []string) error {
 		_ = logFile.Close()
 		return fmt.Errorf("failed to start python chat server: %w", err)
 	}
+	if err := saveChatServerState(cmd.Process.Pid); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to persist chat server state: %v\n", err)
+	}
 	_ = cmd.Process.Release()
 	_ = logFile.Close()
 
 	fmt.Printf("Gimble Chat and Ask agents are running in the background. Chat with Gimble at %s or %s\n", makeHyperlink(loopbackURL), makeHyperlink(localhostURL))
 
+	return nil
+}
+
+type chatServerState struct {
+	PID       int    `json:"pid"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func chatServerStatePath() (string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve user config dir for chat state: %w", err)
+	}
+	stateDir := filepath.Join(base, "gimble")
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create chat state directory: %w", err)
+	}
+	return filepath.Join(stateDir, "chat-server-state.json"), nil
+}
+
+func loadChatServerState() (chatServerState, error) {
+	path, err := chatServerStatePath()
+	if err != nil {
+		return chatServerState{}, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return chatServerState{}, err
+	}
+	var s chatServerState
+	if err := json.Unmarshal(data, &s); err != nil {
+		return chatServerState{}, fmt.Errorf("failed to parse chat server state: %w", err)
+	}
+	return s, nil
+}
+
+func saveChatServerState(pid int) error {
+	path, err := chatServerStatePath()
+	if err != nil {
+		return err
+	}
+	s := chatServerState{
+		PID:       pid,
+		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode chat server state: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write chat server state: %w", err)
+	}
+	return nil
+}
+
+func stopPreviousChatServer() error {
+	s, err := loadChatServerState()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if s.PID <= 0 {
+		return nil
+	}
+
+	if err := syscall.Kill(-s.PID, syscall.SIGTERM); err != nil && err != syscall.ESRCH {
+		if err2 := syscall.Kill(s.PID, syscall.SIGTERM); err2 != nil && err2 != syscall.ESRCH {
+			return fmt.Errorf("failed to stop previous chat server pid %d: %w", s.PID, err2)
+		}
+	}
+
+	for i := 0; i < 12; i++ {
+		if err := syscall.Kill(s.PID, 0); err == syscall.ESRCH {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err := syscall.Kill(-s.PID, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+		if err2 := syscall.Kill(s.PID, syscall.SIGKILL); err2 != nil && err2 != syscall.ESRCH {
+			return fmt.Errorf("failed to force-stop previous chat server pid %d: %w", s.PID, err2)
+		}
+	}
 	return nil
 }
 
@@ -233,11 +337,12 @@ func makeHyperlink(url string) string {
 func printSessionIntro(activeName string, p profile.Profile) {
 	border := "=============================================================="
 	title := []string{
-		"   ____ ___ __  __ ____  _     _____",
-		"  / ___|_ _|  /  | __ )| |   | ____|",
-		" | |  _ | || |/| |  _ \\| |   |  _|",
-		" | |_| || || |  | | |_) | |___| |___",
-		"  \\____|___|_|  |_|____/|_____|_____|",
+		"   ██████╗ ██╗███╗   ███╗██████╗ ██╗     ███████╗",
+		"  ██╔════╝ ██║████╗ ████║██╔══██╗██║     ██╔════╝",
+		"  ██║  ███╗██║██╔████╔██║██████╔╝██║     █████╗",
+		"  ██║   ██║██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝",
+		"  ╚██████╔╝██║██║ ╚═╝ ██║██████╔╝███████╗███████╗",
+		"   ╚═════╝ ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝",
 	}
 
 	fmt.Println()
@@ -245,26 +350,13 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	for _, line := range title {
 		fmt.Println(styleText(line, "1;35"))
 	}
-	fmt.Println(styleText("Deployment Intelligence for Robotics", "1;37"))
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println()
-
-	fmt.Println(styleText("Initializing runtime analysis engine...", "0;37"))
-	fmt.Println(styleText("Indexing logs, telemetry, and deployment traces...", "0;37"))
-	fmt.Println(styleText("Preparing ROS graph and system process inspector...", "0;37"))
-	fmt.Println()
-
-	fmt.Println(styleText("Ready Modules", "1;33"))
-	fmt.Println("  [OK] Logs")
-	fmt.Println("  [OK] Telemetry")
-	fmt.Println("  [OK] Processes")
-	fmt.Println("  [OK] Commits")
-	fmt.Println("  [OK] Fleet state")
+	fmt.Println(styleText("Deployment Intelligence for Robotics", "1;37"))
 	fmt.Println()
 
 	if activeName != "" {
 		fmt.Println(styleText("Active Profile", "1;33"))
-		fmt.Printf("  %s (%s, @%s) [%s]\n", p.Name, p.Email, p.GitHub, activeName)
+		fmt.Printf("  %s (%s, %s) [%s]\n", p.Name, p.Email, profileAccountLabel(p), activeName)
 		fmt.Println()
 	}
 
@@ -305,6 +397,254 @@ func useANSI() bool {
 	}
 	term := strings.ToLower(strings.TrimSpace(os.Getenv("TERM")))
 	return term != "" && term != "dumb"
+}
+
+func maybeRunFirstTimeSetup() error {
+	cfg, err := profile.Load()
+	if err != nil {
+		return err
+	}
+	if cfg.ActiveProfile != "" || len(cfg.Profiles) > 0 {
+		return nil
+	}
+	if !isInteractiveTerminal() {
+		return fmt.Errorf("first-time setup required: run 'gimble setup' in an interactive terminal")
+	}
+	return runSetupWizard()
+}
+
+func isInteractiveTerminal() bool {
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return false
+	}
+	_ = tty.Close()
+	return true
+}
+
+func runSetupWizard() error {
+	if !isInteractiveTerminal() {
+		return fmt.Errorf("setup requires an interactive terminal")
+	}
+
+	fmt.Println("Gimble first-time setup")
+	fmt.Println("This wizard stores config locally on your machine.")
+	fmt.Println()
+
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("setup requires a real terminal")
+	}
+	defer tty.Close()
+
+	reader := bufio.NewReader(tty)
+
+	name, err := promptRequired(reader, "Name")
+	if err != nil {
+		return err
+	}
+
+	email, err := promptRequired(reader, "Email")
+	if err != nil {
+		return err
+	}
+	if err := profile.ValidateEmail(email); err != nil {
+		return err
+	}
+
+	providerChoice, err := promptChoice(reader, "Account provider", []string{"GitHub", "GitLab"})
+	if err != nil {
+		return err
+	}
+	provider := "github"
+	if providerChoice == 2 {
+		provider = "gitlab"
+	}
+
+	handleLabel := "GitHub username"
+	if provider == "gitlab" {
+		handleLabel = "GitLab username"
+	}
+	handle, err := promptRequired(reader, handleLabel)
+	if err != nil {
+		return err
+	}
+	handle = profile.NormalizeGitHub(handle)
+
+	cfg, err := profile.Load()
+	if err != nil {
+		return err
+	}
+	cfg.Upsert("default", profile.Profile{
+		Name:     strings.TrimSpace(name),
+		Email:    strings.TrimSpace(email),
+		GitHub:   handle,
+		Provider: profile.NormalizeProvider(provider),
+	})
+	cfg.ActiveProfile = "default"
+	if err := profile.Save(cfg); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("API key setup (optional, can be added later)")
+	fmt.Println("OpenAI key: https://platform.openai.com/api-keys")
+	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
+	if err != nil {
+		return err
+	}
+	fmt.Println("Groq key: https://console.groq.com/keys")
+	groqKey, err := promptOptional(reader, "Groq API key (press Enter to skip)")
+	if err != nil {
+		return err
+	}
+
+	if err := upsertChatEnv(openAIKey, groqKey); err != nil {
+		return err
+	}
+
+	chatPath, _ := chatEnvPath()
+	fmt.Println()
+	fmt.Printf("Setup complete. Active profile: default (%s, %s:@%s).\n", email, provider, handle)
+	fmt.Printf("Local secrets file: %s\n", chatPath)
+	fmt.Println("Keys are stored locally with user-only permissions and are never pushed by Gimble.")
+	fmt.Println("You can now run: gimble")
+	return nil
+}
+
+func promptRequired(reader *bufio.Reader, label string) (string, error) {
+	for {
+		fmt.Printf("%s: ", label)
+		v, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+		v = strings.TrimSpace(v)
+		if v != "" {
+			return v, nil
+		}
+		fmt.Println("Value is required.")
+	}
+}
+
+func promptOptional(reader *bufio.Reader, label string) (string, error) {
+	fmt.Printf("%s: ", label)
+	v, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(v), nil
+}
+
+func promptChoice(reader *bufio.Reader, label string, options []string) (int, error) {
+	fmt.Printf("%s\n", label)
+	for i, opt := range options {
+		fmt.Printf("  %d) %s\n", i+1, opt)
+	}
+	for {
+		fmt.Printf("Select [1-%d]: ", len(options))
+		v, err := reader.ReadString('\n')
+		if err != nil {
+			return 0, err
+		}
+		v = strings.TrimSpace(v)
+		n, err := strconv.Atoi(v)
+		if err == nil && n >= 1 && n <= len(options) {
+			return n, nil
+		}
+		fmt.Println("Invalid selection.")
+	}
+}
+
+func chatEnvPath() (string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve user config dir: %w", err)
+	}
+	dir := filepath.Join(base, "gimble")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create gimble config dir: %w", err)
+	}
+	return filepath.Join(dir, "chat.env"), nil
+}
+
+func loadKeyValueEnv(path string) (map[string]string, error) {
+	values := map[string]string{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return values, nil
+		}
+		return nil, err
+	}
+	for _, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "export ") {
+			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		values[strings.TrimSpace(parts[0])] = strings.TrimSpace(strings.Trim(parts[1], "\"'"))
+	}
+	return values, nil
+}
+
+func saveKeyValueEnv(path string, values map[string]string) error {
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	b.WriteString("# Gimble local chat secrets (never commit)\n")
+	for _, k := range keys {
+		v := strings.TrimSpace(values[k])
+		if v == "" {
+			continue
+		}
+		b.WriteString(k)
+		b.WriteString("=")
+		b.WriteString(v)
+		b.WriteString("\n")
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o600)
+}
+
+func upsertChatEnv(openAIKey, groqKey string) error {
+	path, err := chatEnvPath()
+	if err != nil {
+		return err
+	}
+	vals, err := loadKeyValueEnv(path)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", path, err)
+	}
+	if strings.TrimSpace(openAIKey) != "" {
+		vals["OPENAI_API_KEY"] = strings.TrimSpace(openAIKey)
+		if strings.TrimSpace(vals["OPENAI_MODEL"]) == "" {
+			vals["OPENAI_MODEL"] = "gpt-4o-mini"
+		}
+	}
+	if strings.TrimSpace(groqKey) != "" {
+		vals["GROQ_API_KEY"] = strings.TrimSpace(groqKey)
+		if strings.TrimSpace(vals["GROQ_MODEL"]) == "" {
+			vals["GROQ_MODEL"] = "openai/gpt-oss-120b"
+		}
+	}
+	return saveKeyValueEnv(path, vals)
+}
+func profileAccountProvider(p profile.Profile) string {
+	return profile.NormalizeProvider(p.Provider)
+}
+
+func profileAccountLabel(p profile.Profile) string {
+	return fmt.Sprintf("%s:@%s", profileAccountProvider(p), p.GitHub)
 }
 
 func runProfile(args []string) error {
@@ -348,7 +688,7 @@ func profileList() error {
 			prefix = "*"
 		}
 		p := cfg.Profiles[name]
-		fmt.Printf("%s %s\t%s\t@%s\n", prefix, name, p.Email, p.GitHub)
+		fmt.Printf("%s %s	%s	%s\n", prefix, name, p.Email, profileAccountLabel(p))
 	}
 	return nil
 }
@@ -377,7 +717,7 @@ func profileShow(args []string) error {
 	fmt.Printf("profile: %s\n", name)
 	fmt.Printf("name:    %s\n", p.Name)
 	fmt.Printf("email:   %s\n", p.Email)
-	fmt.Printf("github:  @%s\n", p.GitHub)
+	fmt.Printf("account: %s\n", profileAccountLabel(p))
 	if cfg.ActiveProfile == name {
 		fmt.Println("active:  yes")
 	}
@@ -436,6 +776,7 @@ func profileSet(args []string) error {
 	name := fs.String("name", "", "full name")
 	email := fs.String("email", "", "email address")
 	github := fs.String("github", "", "GitHub username")
+	provider := fs.String("provider", "github", "account provider: github|gitlab")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -468,9 +809,15 @@ func profileSet(args []string) error {
 	if *github != "" {
 		p.GitHub = profile.NormalizeGitHub(*github)
 	}
+	if *provider != "" {
+		p.Provider = profile.NormalizeProvider(*provider)
+	}
 
 	if strings.TrimSpace(p.Name) == "" || strings.TrimSpace(p.Email) == "" || strings.TrimSpace(p.GitHub) == "" {
-		return fmt.Errorf("profile %q must include name, email, and github (use --name, --email, --github)", normalizedName)
+		return fmt.Errorf("profile %q must include name, email, and account handle (use --name, --email, --github)", normalizedName)
+	}
+	if strings.TrimSpace(p.Provider) == "" {
+		p.Provider = "github"
 	}
 
 	cfg.Upsert(normalizedName, p)
@@ -496,7 +843,7 @@ func profileInit(args []string) error {
 	name := fs.String("name", "", "full name")
 	email := fs.String("email", "", "email address")
 	github := fs.String("github", "", "GitHub username")
-
+	provider := fs.String("provider", "github", "account provider: github|gitlab")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -518,9 +865,10 @@ func profileInit(args []string) error {
 	}
 
 	cfg.Upsert(normalizedName, profile.Profile{
-		Name:   strings.TrimSpace(*name),
-		Email:  strings.TrimSpace(*email),
-		GitHub: profile.NormalizeGitHub(*github),
+		Name:     strings.TrimSpace(*name),
+		Email:    strings.TrimSpace(*email),
+		GitHub:   profile.NormalizeGitHub(*github),
+		Provider: profile.NormalizeProvider(*provider),
 	})
 	cfg.ActiveProfile = normalizedName
 
@@ -566,10 +914,11 @@ func runSession() error {
 			"GIMBLE_USER_NAME="+p.Name,
 			"GIMBLE_USER_EMAIL="+p.Email,
 			"GIMBLE_USER_GITHUB="+p.GitHub,
+			"GIMBLE_USER_ACCOUNT_PROVIDER="+profileAccountProvider(p),
 		)
 		promptPrefix = "gimble:" + activeName
 		printSessionIntro(activeName, p)
-		fmt.Printf("Entering Gimble session as %s (%s, @%s). Type 'exit' to leave.\n", p.Name, p.Email, p.GitHub)
+		fmt.Printf("Entering Gimble session as %s (%s, %s). Type 'exit' to leave.\n", p.Name, p.Email, profileAccountLabel(p))
 	} else {
 		printSessionIntro("", profile.Profile{})
 		fmt.Printf("Entering Gimble session on %s/%s. Type 'exit' to leave.\n", runtime.GOOS, runtime.GOARCH)
@@ -642,14 +991,15 @@ func helpText() string {
   gimble                     Start Gimble shell session
   gimble session             Start Gimble shell session
   gimble --version           Print version
+  gimble setup               Run first-time setup wizard
   gimble profile <command>   Manage Gimble profiles
 
 Inside a Gimble session, use:
   gim chat                   Start ChatGPT-style local chat UI server
 
 Profile Commands:
-  gimble profile init --name <name> --email <email> --github <github> [--profile <name>]
-  gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>]
+  gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]
+  gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]
   gimble profile list
   gimble profile show [profile]
   gimble profile use <profile>
@@ -659,8 +1009,8 @@ Profile Commands:
 
 func profileHelpText() string {
 	return `Usage:
-  gimble profile init --name <name> --email <email> --github <github> [--profile <name>]
-  gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>]
+  gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]
+  gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]
   gimble profile list
   gimble profile show [profile]
   gimble profile use <profile>
