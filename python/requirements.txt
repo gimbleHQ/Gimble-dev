@@ -2,3 +2,4 @@ flask>=3.0.0,<4
 openai>=1.50.0,<2
 llama-cpp-python>=0.2.90,<0.4
 huggingface-hub>=0.25.0,<1
+waitress>=3.0.0,<4

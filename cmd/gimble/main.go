@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/gimble-dev/gimble/internal/platform"
 	"github.com/gimble-dev/gimble/internal/profile"
@@ -103,21 +105,58 @@ func runPythonChat(args []string) error {
 	}
 	_ = ln.Close()
 
-	url := fmt.Sprintf("http://localhost:%d", actualPort)
-	fmt.Printf("Gimble chat UI: %s\n", makeHyperlink(url)+" ("+url+")")
-	fmt.Println("Open this URL in your browser. Press Ctrl+C to stop.")
+	localhostURL := fmt.Sprintf("http://localhost:%d", actualPort)
+	loopbackURL := fmt.Sprintf("http://127.0.0.1:%d", actualPort)
 
 	cmd := exec.Command(pythonExe, scriptPath, "--port", strconv.Itoa(actualPort))
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdin = nil
 	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("python chat server failed: %w", err)
+	logFile, logPath, err := openChatServerLogFile()
+	if err != nil {
+		return err
 	}
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
+	if err := cmd.Start(); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to start python chat server: %w", err)
+	}
+	_ = cmd.Process.Release()
+	_ = logFile.Close()
+
+	fmt.Printf("gim chat is running in the background. Chat with Gimble at %s (%s)\n", makeHyperlink(loopbackURL), loopbackURL)
+	fmt.Printf("Also available at %s (%s)\n", makeHyperlink(localhostURL), localhostURL)
+	fmt.Printf("Logs: %s\n", logPath)
 
 	return nil
+}
+
+func openChatServerLogFile() (*os.File, string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to resolve user config dir for logs: %w", err)
+	}
+	logDir := filepath.Join(base, "gimble")
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		return nil, "", fmt.Errorf("failed to create log directory: %w", err)
+	}
+	logPath := filepath.Join(logDir, "chat-server.log")
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to open log file: %w", err)
+	}
+	if _, err := f.WriteString("\n==== gim chat start ====\n"); err != nil {
+		_ = f.Close()
+		return nil, "", fmt.Errorf("failed to initialize log file: %w", err)
+	}
+	if _, err := io.WriteString(f, "chat server process launched\n"); err != nil {
+		_ = f.Close()
+		return nil, "", fmt.Errorf("failed to initialize log file: %w", err)
+	}
+	return f, logPath, nil
 }
 
 func findPythonInterpreter() (string, error) {

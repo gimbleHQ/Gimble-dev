@@ -339,9 +339,20 @@ def create_app() -> Flask:
 
     store = ConversationStore(valid_keys)
 
+    session_config = {
+        "profile": os.getenv("GIMBLE_PROFILE", ""),
+        "name": os.getenv("GIMBLE_USER_NAME", ""),
+        "email": os.getenv("GIMBLE_USER_EMAIL", ""),
+        "github": os.getenv("GIMBLE_USER_GITHUB", ""),
+    }
+
     @app.get("/")
     def index():
         return send_from_directory(app.static_folder, "index.html")
+
+    @app.get("/api/session-config")
+    def session_cfg():
+        return jsonify(session_config)
 
     @app.get("/api/models")
     def models():
@@ -395,8 +406,21 @@ def main() -> None:
     args = parser.parse_args()
 
     app = create_app()
-    print(f"Python chat server listening on http://127.0.0.1:{args.port}")
-    app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
+    localhost_url = f"http://localhost:{args.port}"
+    loopback_url = f"http://127.0.0.1:{args.port}"
+    print(f"Python chat server listening on {localhost_url}")
+    print(f"Python chat server listening on {loopback_url}")
+
+    try:
+        from waitress import serve
+    except ModuleNotFoundError:
+        raise SystemExit(
+            f"Missing Python package: waitress\n"
+            f"Install dependencies with:\n"
+            f"  python3 -m pip install -r {REQ_FILE}"
+        )
+
+    serve(app, host="127.0.0.1", port=args.port, threads=8)
 
 
 if __name__ == "__main__":
