@@ -113,7 +113,7 @@ func runPythonChat(args []string) error {
 	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	logFile, logPath, err := openChatServerLogFile()
+	logFile, _, err := openChatServerLogFile()
 	if err != nil {
 		return err
 	}
@@ -127,9 +127,7 @@ func runPythonChat(args []string) error {
 	_ = cmd.Process.Release()
 	_ = logFile.Close()
 
-	fmt.Printf("gim chat is running in the background. Chat with Gimble at %s (%s)\n", makeHyperlink(loopbackURL), loopbackURL)
-	fmt.Printf("Also available at %s (%s)\n", makeHyperlink(localhostURL), localhostURL)
-	fmt.Printf("Logs: %s\n", logPath)
+	fmt.Printf("Gimble Chat and Ask agents are running in the background. Chat with Gimble at %s or %s\n", makeHyperlink(loopbackURL), makeHyperlink(localhostURL))
 
 	return nil
 }
@@ -230,6 +228,83 @@ func listenWithFallback(preferredPort int) (net.Listener, int, error) {
 func makeHyperlink(url string) string {
 	// ESC ] 8 ; ; <url> ESC \ <text> ESC ] 8 ; ; ESC \
 	return "\x1b]8;;" + url + "\x1b\\" + url + "\x1b]8;;\x1b\\"
+}
+
+func printSessionIntro(activeName string, p profile.Profile) {
+	border := "=============================================================="
+	title := []string{
+		"   ____ ___ __  __ ____  _     _____",
+		"  / ___|_ _|  /  | __ )| |   | ____|",
+		" | |  _ | || |/| |  _ \\| |   |  _|",
+		" | |_| || || |  | | |_) | |___| |___",
+		"  \\____|___|_|  |_|____/|_____|_____|",
+	}
+
+	fmt.Println()
+	fmt.Println(styleText(border, "1;36"))
+	for _, line := range title {
+		fmt.Println(styleText(line, "1;35"))
+	}
+	fmt.Println(styleText("Deployment Intelligence for Robotics", "1;37"))
+	fmt.Println(styleText(border, "1;36"))
+	fmt.Println()
+
+	fmt.Println(styleText("Initializing runtime analysis engine...", "0;37"))
+	fmt.Println(styleText("Indexing logs, telemetry, and deployment traces...", "0;37"))
+	fmt.Println(styleText("Preparing ROS graph and system process inspector...", "0;37"))
+	fmt.Println()
+
+	fmt.Println(styleText("Ready Modules", "1;33"))
+	fmt.Println("  [OK] Logs")
+	fmt.Println("  [OK] Telemetry")
+	fmt.Println("  [OK] Processes")
+	fmt.Println("  [OK] Commits")
+	fmt.Println("  [OK] Fleet state")
+	fmt.Println()
+
+	if activeName != "" {
+		fmt.Println(styleText("Active Profile", "1;33"))
+		fmt.Printf("  %s (%s, @%s) [%s]\n", p.Name, p.Email, p.GitHub, activeName)
+		fmt.Println()
+	}
+
+	fmt.Println("Gimble helps you debug deployment failures, inspect runtime behavior,")
+	fmt.Println("and trace issues across code, infrastructure, and robots in the field.")
+	fmt.Println()
+	fmt.Println(styleText("Capabilities", "1;33"))
+	fmt.Println("  - Runtime log analysis")
+	fmt.Println("  - ROS graph inspection")
+	fmt.Println("  - Core dump investigation")
+	fmt.Println("  - Deployment history tracing")
+	fmt.Println("  - Fleet anomaly detection")
+	fmt.Println()
+	fmt.Println(styleText("Function", "1;33"))
+	fmt.Println("  gim chat    Starts the local web chat UI on an available localhost port")
+	fmt.Println("              and continues running in the background.")
+	fmt.Println()
+	fmt.Println(styleText("Try Asking", "1;33"))
+	fmt.Println("  > why did the perception pipeline crash?")
+	fmt.Println("  > analyze latest ros logs")
+	fmt.Println("  > inspect GPU usage on robot-03")
+	fmt.Println("  > investigate deployment failures")
+	fmt.Println()
+	fmt.Println("Diagnose logs, ask a question, or connect a robot.")
+	fmt.Println()
+}
+
+func styleText(s, code string) string {
+	if !useANSI() {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+
+func useANSI() bool {
+	if strings.TrimSpace(os.Getenv("NO_COLOR")) != "" {
+		return false
+	}
+	term := strings.ToLower(strings.TrimSpace(os.Getenv("TERM")))
+	return term != "" && term != "dumb"
 }
 
 func runProfile(args []string) error {
@@ -493,8 +568,10 @@ func runSession() error {
 			"GIMBLE_USER_GITHUB="+p.GitHub,
 		)
 		promptPrefix = "gimble:" + activeName
+		printSessionIntro(activeName, p)
 		fmt.Printf("Entering Gimble session as %s (%s, @%s). Type 'exit' to leave.\n", p.Name, p.Email, p.GitHub)
 	} else {
+		printSessionIntro("", profile.Profile{})
 		fmt.Printf("Entering Gimble session on %s/%s. Type 'exit' to leave.\n", runtime.GOOS, runtime.GOARCH)
 		fmt.Println("Tip: initialize a profile with: gimble profile init --name \"Your Name\" --email you@example.com --github yourhandle")
 	}

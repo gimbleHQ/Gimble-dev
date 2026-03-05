@@ -209,8 +209,8 @@ Key setup details:
 Publish a release:
 
 ```bash
-git tag v0.1.10
-git push origin v0.1.10
+git tag v0.1.11
+git push origin v0.1.11
 ```
 
 ## Updating Gimble

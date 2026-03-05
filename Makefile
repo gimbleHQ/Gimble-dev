@@ -1,5 +1,5 @@
 APP := gimble
-VERSION ?= 0.1.10
+VERSION ?= 0.1.11
 LDFLAGS := -X main.version=$(VERSION)
 
 .PHONY: build build-linux build-macos package-deb clean
