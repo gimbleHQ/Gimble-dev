@@ -1051,15 +1051,91 @@ func prepareSessionLogPath() (string, error) {
 	return path, nil
 }
 
-func newLoggedShellCommand(shell string, logPath string) (*exec.Cmd, error) {
+func findSessionLogSanitizerScript() (string, error) {
+	if explicit := strings.TrimSpace(os.Getenv("GIMBLE_LOG_SANITIZER")); explicit != "" {
+		if _, err := os.Stat(explicit); err == nil {
+			return explicit, nil
+		}
+		return "", fmt.Errorf("GIMBLE_LOG_SANITIZER points to a missing file: %s", explicit)
+	}
+
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+	candidates := []string{
+		filepath.Join("python", "session_log_sanitizer.py"),
+		filepath.Join(exeDir, "..", "share", "gimble", "python", "session_log_sanitizer.py"),
+		filepath.Join(exeDir, "python", "session_log_sanitizer.py"),
+		filepath.Join(exeDir, "..", "python", "session_log_sanitizer.py"),
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("could not locate session log sanitizer script")
+}
+
+func findPythonForLogFilter() (string, error) {
+	for _, candidate := range []string{"python3", "python"} {
+		if p, err := exec.LookPath(candidate); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("python not found for log sanitization")
+}
+
+func newLoggedShellCommand(shell string, cleanLogPath string) (*exec.Cmd, error) {
 	scriptBin, err := exec.LookPath("script")
 	if err != nil {
 		return nil, fmt.Errorf("terminal logger 'script' not found; install util-linux (Linux) or BSD script (macOS)")
 	}
-	if runtime.GOOS == "darwin" {
-		return exec.Command(scriptBin, "-q", "-F", logPath, shell, "-i"), nil
+	pyBin, err := findPythonForLogFilter()
+	if err != nil {
+		return nil, err
 	}
-	return exec.Command(scriptBin, "-q", "-F", logPath, "-c", shell+" -i"), nil
+	sanitizerScript, err := findSessionLogSanitizerScript()
+	if err != nil {
+		return nil, err
+	}
+
+	rawLogPath := strings.TrimSuffix(cleanLogPath, ".log") + ".raw.log"
+	rawFile, err := os.OpenFile(rawLogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raw session log file: %w", err)
+	}
+	_ = rawFile.Close()
+
+	scriptFlag := "-f"
+	if runtime.GOOS == "darwin" {
+		scriptFlag = "-F"
+	}
+
+	wrapper := `set -eu
+RAW="$1"
+CLEAN="$2"
+SHELL_BIN="$3"
+SCRIPT_BIN="$4"
+PY_BIN="$5"
+SCRIPT_FLAG="$6"
+SANITIZER="$7"
+
+"$PY_BIN" -u "$SANITIZER" "$RAW" "$CLEAN" &
+SAN_PID=$!
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" "$SHELL_BIN" -i
+else
+  "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" -c "$SHELL_BIN -i"
+fi
+STATUS=$?
+sleep 0.3
+kill "$SAN_PID" >/dev/null 2>&1 || true
+wait "$SAN_PID" 2>/dev/null || true
+exit "$STATUS"
+`
+
+	cmd := exec.Command("sh", "-c", wrapper, "sh", rawLogPath, cleanLogPath, shell, scriptBin, pyBin, scriptFlag, sanitizerScript)
+	return cmd, nil
 }
 
 func createSessionShimDir() (cleanup func(), shimDir string, err error) {

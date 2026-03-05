@@ -109,6 +109,11 @@ gim chat
 ```
 
 By default, `gim chat` uses an automatically selected open localhost port.
+
+Gimble session logs are written in live-updating, sanitized plain text with timestamps under:
+
+- Linux: `~/.config/gimble/session-logs/`
+- macOS: `~/Library/Application Support/gimble/session-logs/
 Use `gim chat --port <port>` only when you want to pin a specific port.
 
 ### System prompt support
@@ -234,8 +239,8 @@ Key setup details:
 Publish a release:
 
 ```bash
-git tag v0.1.13
-git push origin v0.1.13
+git tag v0.1.14
+git push origin v0.1.14
 ```
 
 ## Updating Gimble
