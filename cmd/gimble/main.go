@@ -39,7 +39,7 @@ func run(args []string) error {
 	inSession := os.Getenv("GIMBLE_SESSION") == "1"
 
 	if inSession && len(args) == 0 {
-		return fmt.Errorf("already inside a Gimble session; use 'exit' to leave")
+		return fmt.Errorf("already inside a Gimble session; use 'gim exit' to leave")
 	}
 
 	if len(args) == 0 {
@@ -60,7 +60,7 @@ func run(args []string) error {
 		return nil
 	case "session":
 		if inSession {
-			return fmt.Errorf("already inside a Gimble session; use 'exit' to leave")
+			return fmt.Errorf("already inside a Gimble session; use 'gim exit' to leave")
 		}
 		if err := maybeRunFirstTimeSetup(); err != nil {
 			return err
@@ -115,7 +115,8 @@ func runPythonChat(args []string) error {
 		return err
 	}
 
-	if err := ensurePythonChatRuntime(pythonExe, scriptPath); err != nil {
+	pythonExe, err = ensurePythonChatRuntime(pythonExe, scriptPath)
+	if err != nil {
 		return err
 	}
 
@@ -130,7 +131,7 @@ func runPythonChat(args []string) error {
 
 	cmd := exec.Command(pythonExe, scriptPath, "--port", strconv.Itoa(actualPort))
 	cmd.Stdin = nil
-	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1", "GIMBLE_SESSION_SHELL_PID="+strconv.Itoa(os.Getppid()))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	logFile, logPath, err := openChatServerLogFile()
@@ -292,9 +293,9 @@ func waitForChatServerReady(port int, pid int, timeout time.Duration) error {
 	return fmt.Errorf("server did not become ready on time")
 }
 
-func ensurePythonChatRuntime(pythonExe string, scriptPath string) error {
+func ensurePythonChatRuntime(pythonExe string, scriptPath string) (string, error) {
 	if err := checkPythonRuntimeImports(pythonExe); err == nil {
-		return nil
+		return pythonExe, nil
 	}
 
 	setupScript := filepath.Join(filepath.Dir(scriptPath), "setup_runtime.sh")
@@ -304,14 +305,18 @@ func ensurePythonChatRuntime(pythonExe string, scriptPath string) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to auto-install chat runtime: %w", err)
+			return "", fmt.Errorf("failed to auto-install chat runtime: %w", err)
 		}
 	}
 
-	if err := checkPythonRuntimeImports(pythonExe); err != nil {
-		return fmt.Errorf("python chat runtime is not ready: %w\nRun: %s", err, runtimeSetupHint(scriptPath))
+	if resolved, err := findPythonInterpreter(); err == nil {
+		pythonExe = resolved
 	}
-	return nil
+
+	if err := checkPythonRuntimeImports(pythonExe); err != nil {
+		return "", fmt.Errorf("python chat runtime is not ready: %w\nRun: %s", err, runtimeSetupHint(scriptPath))
+	}
+	return pythonExe, nil
 }
 
 func checkPythonRuntimeImports(pythonExe string) error {
@@ -989,10 +994,10 @@ func runSession() error {
 		)
 		promptPrefix = "gimble:" + activeName
 		printSessionIntro(activeName, p)
-		fmt.Printf("Entering Gimble session as %s (%s, %s). Type 'exit' to leave.\n", p.Name, p.Email, profileAccountLabel(p))
+		fmt.Printf("Entering Gimble session as %s (%s, %s). Type 'gim exit' to leave.\n", p.Name, p.Email, profileAccountLabel(p))
 	} else {
 		printSessionIntro("", profile.Profile{})
-		fmt.Printf("Entering Gimble session on %s/%s. Type 'exit' to leave.\n", runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("Entering Gimble session on %s/%s. Type 'gim exit' to leave.\n", runtime.GOOS, runtime.GOARCH)
 		fmt.Println("Tip: initialize a profile with: gimble profile init --name \"Your Name\" --email you@example.com --github yourhandle")
 	}
 
@@ -1009,6 +1014,7 @@ func runSession() error {
 		return err
 	}
 	fmt.Printf("Session logging enabled: %s\n", logPath)
+	env = append(env, "GIMBLE_SESSION_LOG_PATH="+logPath)
 
 	cmd, err := newLoggedShellCommand(shell, logPath)
 	if err != nil {
@@ -1153,14 +1159,14 @@ func createSessionShimDir() (cleanup func(), shimDir string, err error) {
 		return func() {}, "", err
 	}
 
-	gimScript := fmt.Sprintf("#!/bin/sh\nexec %q __session_cmd \"$@\"\n", exe)
+	gimScript := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = \"exit\" ]; then\n  kill -HUP \"$PPID\" >/dev/null 2>&1 || kill -TERM \"$PPID\" >/dev/null 2>&1\n  exit 0\nfi\nexec %q __session_cmd \"$@\"\n", exe)
 	gimPath := filepath.Join(dir, "gim")
 	if err := os.WriteFile(gimPath, []byte(gimScript), 0o755); err != nil {
 		_ = os.RemoveAll(dir)
 		return func() {}, "", err
 	}
 
-	blockScript := "#!/bin/sh\necho \"Already inside a Gimble session. Use 'exit' to leave.\" 1>&2\nexit 1\n"
+	blockScript := "#!/bin/sh\necho \"Already inside a Gimble session. Use 'gim exit' to leave.\" 1>&2\nexit 1\n"
 	for _, name := range []string{"gimble", "Gimble"} {
 		path := filepath.Join(dir, name)
 		if err := os.WriteFile(path, []byte(blockScript), 0o755); err != nil {
@@ -1189,6 +1195,7 @@ func helpText() string {
 
 Inside a Gimble session, use:
   gim chat                   Start ChatGPT-style local chat UI server
+  gim exit                   Exit the active Gimble session
 
 Profile Commands:
   gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]

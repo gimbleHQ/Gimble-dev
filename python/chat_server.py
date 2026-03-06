@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
 import argparse
+import errno
 import os
 import platform
+import re
 import shutil
 import tempfile
 import threading
+import time
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     from flask import Flask, jsonify, request, send_from_directory
 except ModuleNotFoundError as exc:
     missing = str(exc).split("'")[-2] if "'" in str(exc) else "flask"
-    req_file = Path(__file__).resolve().parent / "requirements.txt"
+    req_file = Path(__file__).resolve().parent / "requirements-core.txt"
     print(f"Missing Python package: {missing}")
     print("Install dependencies with:")
     print(f"  python3 -m pip install -r {req_file}")
     raise SystemExit(1)
 
 
-DEFAULT_SYSTEM_PROMPT = "You are Gimble Assistant. Be concise, practical, and clear."
-REQ_FILE = Path(__file__).resolve().parent / "requirements.txt"
+DEFAULT_SYSTEM_PROMPT = """You are Gimble, the debugging and observability engine behind gimble.dev. Your task is to analyze terminal logs from a user's robot session. Logs may include ROS/ROS2 logs, system/OS logs, sensor logs (LiDAR, IMU, cameras), GPU/CPU/memory telemetry, inference logs, and other application processes. Use timestamps and log content to infer what the user recently did, what processes or ROS nodes are running, what topics or components appear active, and what the system is doing. Act as a robot debugging agent: interpret logs to extract meaning, identify errors, warnings, crashes, stalled nodes, abnormal resource usage, memory leaks, or other anomalies. Focus on signal over noise and produce concise, information-dense insights when analysis is requested. Logs will arrive incrementally in chunks over time (typically the last ~100 lines copied from the terminal). Continuously consume them and build context across messages. You may discard older normal context if memory becomes limited, but prioritize and retain any anomalies, crashes, warnings, faults, or abnormal behavior, and remain biased toward recent events. When the user sends logs, do not analyze or respond with a long message-simply acknowledge with "OK, received." When the user later asks questions such as what happened, what is going on, what recently occurred, why something failed, or what processes/nodes are active, then analyze the accumulated logs and provide clear debugging insights and explanations."""
+REQ_FILE = Path(__file__).resolve().parent / "requirements-core.txt"
 
 GROQ_MODELS = [
     "openai/gpt-oss-120b",
@@ -49,6 +52,177 @@ DEFAULT_GPTQ4K_URL = (
     "https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/"
     "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf"
 )
+
+LOG_INGEST_INTERVAL_SECONDS = 15.0
+MAX_CONTEXT_CHARS = 24000
+MAX_RECENT_LINES = 800
+MAX_ANOMALY_LINES = 300
+LOG_ACK_MESSAGE = "OK, received."
+
+LOG_LIKE_LINE = re.compile(
+    r"(^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\])"
+    r"|(^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})"
+    r"|(\b(INFO|WARN|WARNING|ERROR|FATAL|DEBUG|TRACE|EXCEPTION)\b)"
+    r"|(\b(ros|ros2|node|topic|lcm|dds|telemetry|gpu|cpu|memory)\b)"
+    ,
+    re.IGNORECASE,
+)
+ANOMALY_LINE = re.compile(
+    r"\b(error|warn|warning|fatal|exception|crash|failed|failure|timeout|oom|killed|segfault|fault|stalled|anomaly)\b",
+    re.IGNORECASE,
+)
+
+
+def is_likely_log_dump(text: str) -> bool:
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if len(lines) < 5:
+        return False
+    scored = sum(1 for ln in lines if LOG_LIKE_LINE.search(ln))
+    return scored >= 3
+
+
+class TerminalContextStore:
+    def __init__(self, log_path: Optional[Path], shell_pid: int) -> None:
+        self.log_path = log_path
+        self.shell_pid = shell_pid
+        self._lock = threading.Lock()
+        self._recent_lines: List[str] = []
+        self._anomaly_lines: List[str] = []
+        self._offset = 0
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._active = False
+        self._last_ingest_at = 0.0
+
+    def start(self) -> None:
+        if not self.log_path:
+            self._active = False
+            return
+
+        if self.log_path.exists():
+            try:
+                self._offset = self.log_path.stat().st_size
+            except OSError:
+                self._offset = 0
+
+        self._active = self._shell_alive()
+        if not self._active:
+            return
+
+        self._thread = threading.Thread(target=self._run, name="gimble-log-ingestor", daemon=True)
+        self._thread.start()
+
+    def is_active(self) -> bool:
+        with self._lock:
+            return self._active
+
+    def status(self) -> Dict[str, object]:
+        with self._lock:
+            last_ingest_at = self._last_ingest_at
+            active = self._active
+        return {
+            "active": active,
+            "last_ingest_at": int(last_ingest_at) if last_ingest_at > 0 else None,
+            "interval_seconds": int(LOG_INGEST_INTERVAL_SECONDS),
+        }
+
+    def ingest_text(self, text: str) -> None:
+        if not text:
+            return
+        lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return
+        with self._lock:
+            self._recent_lines.extend(lines)
+            if len(self._recent_lines) > MAX_RECENT_LINES:
+                self._recent_lines = self._recent_lines[-MAX_RECENT_LINES:]
+
+            for line in lines:
+                if ANOMALY_LINE.search(line):
+                    self._anomaly_lines.append(line)
+            if len(self._anomaly_lines) > MAX_ANOMALY_LINES:
+                self._anomaly_lines = self._anomaly_lines[-MAX_ANOMALY_LINES:]
+
+            self._last_ingest_at = time.time()
+
+    def render_context(self) -> str:
+        with self._lock:
+            if not self._active:
+                return ""
+            if not self._recent_lines and not self._anomaly_lines:
+                return ""
+            recent = "\n".join(self._recent_lines[-200:])
+            anomalies = "\n".join(self._anomaly_lines[-80:])
+
+        parts: List[str] = [
+            "Live terminal context from current Gimble session (incremental background ingestion)."
+        ]
+        if anomalies:
+            parts.append("Anomalies / warnings / failures (prioritized):")
+            parts.append(anomalies)
+        if recent:
+            parts.append("Most recent terminal lines:")
+            parts.append(recent)
+        context = "\n\n".join(parts)
+        if len(context) > MAX_CONTEXT_CHARS:
+            context = context[-MAX_CONTEXT_CHARS:]
+        return context
+
+    def _shell_alive(self) -> bool:
+        if self.shell_pid <= 0:
+            return True
+        try:
+            os.kill(self.shell_pid, 0)
+            return True
+        except OSError as exc:
+            if exc.errno == errno.ESRCH:
+                return False
+            return True
+
+    def _read_new_bytes(self) -> str:
+        if not self.log_path or not self.log_path.exists():
+            return ""
+        size = self.log_path.stat().st_size
+        if size < self._offset:
+            self._offset = 0
+        if size == self._offset:
+            return ""
+
+        with self.log_path.open("r", encoding="utf-8", errors="replace") as f:
+            f.seek(self._offset)
+            chunk = f.read()
+            self._offset = f.tell()
+        return chunk
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            if not self._shell_alive():
+                with self._lock:
+                    self._active = False
+                return
+            chunk = self._read_new_bytes()
+            if chunk:
+                self.ingest_text(chunk)
+            self._stop.wait(LOG_INGEST_INTERVAL_SECONDS)
+
+
+def with_terminal_context(messages: List[Dict[str, str]], terminal_context: str) -> List[Dict[str, str]]:
+    if not terminal_context:
+        return messages
+
+    context_message = {
+        "role": "system",
+        "content": (
+            "Background terminal context is continuously ingested. Use it when the user asks for analysis. "
+            "Do not proactively dump it unless asked.\n\n" + terminal_context
+        ),
+    }
+
+    if not messages:
+        return [context_message]
+    if messages[0].get("role") == "system":
+        return [messages[0], context_message] + messages[1:]
+    return [context_message] + messages
 
 
 def chat_env_path() -> Path:
@@ -193,7 +367,7 @@ class LlamaCppBackend:
             try:
                 from llama_cpp import Llama
             except ModuleNotFoundError:
-                raise RuntimeError(f"llama-cpp-python is required. Run: python3 -m pip install -r {REQ_FILE}")
+                raise RuntimeError(f"llama-cpp-python is required for GPT-Q 4K experimental model. Run: python3 -m pip install -r {Path(__file__).resolve().parent / 'requirements-optional-local.txt'}")
 
             self._llm = Llama(
                 model_path=str(self.model_path),
@@ -339,6 +513,16 @@ def create_app() -> Flask:
 
     store = ConversationStore(valid_keys)
 
+    raw_log_path = os.getenv("GIMBLE_SESSION_LOG_PATH", "").strip()
+    session_log_path = Path(raw_log_path).expanduser() if raw_log_path else None
+    try:
+        session_shell_pid = int((os.getenv("GIMBLE_SESSION_SHELL_PID", "0") or "0").strip())
+    except ValueError:
+        session_shell_pid = 0
+
+    terminal_context = TerminalContextStore(session_log_path, session_shell_pid)
+    terminal_context.start()
+
     session_config = {
         "profile": os.getenv("GIMBLE_PROFILE", ""),
         "name": os.getenv("GIMBLE_USER_NAME", ""),
@@ -357,6 +541,10 @@ def create_app() -> Flask:
     @app.get("/api/models")
     def models():
         return jsonify({"default": default_key, "models": model_options})
+
+    @app.get("/api/context-status")
+    def context_status():
+        return jsonify(terminal_context.status())
 
     @app.post("/api/chat")
     def chat():
@@ -382,13 +570,21 @@ def create_app() -> Flask:
             return jsonify({"error": "message cannot be empty"}), 400
 
         history = store.append_user(model_key, user_text)
+
+        if terminal_context.is_active() and is_likely_log_dump(user_text):
+            terminal_context.ingest_text(user_text)
+            store.append_assistant(model_key, LOG_ACK_MESSAGE)
+            return jsonify({"reply": LOG_ACK_MESSAGE})
+
+        request_messages = with_terminal_context(history, terminal_context.render_context())
+
         try:
             if provider == "groq":
-                reply = groq_backend.chat(history, model_name)
+                reply = groq_backend.chat(request_messages, model_name)
             elif provider == "openai":
-                reply = openai_backend.chat(history, model_name)
+                reply = openai_backend.chat(request_messages, model_name)
             elif model_key == EXPERIMENTAL_GPTQ_KEY:
-                reply = gptq_backend.chat(history)
+                reply = gptq_backend.chat(request_messages)
             else:
                 return jsonify({"error": f"unsupported provider: {provider}"}), 400
         except Exception as exc:  # noqa: BLE001

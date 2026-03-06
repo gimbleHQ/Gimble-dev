@@ -211,7 +211,7 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      gap: 0;
+      gap: 8px;
       min-width: 0;
       flex: 1;
     }
@@ -220,7 +220,7 @@
       border: 1px solid var(--line);
       border-radius: 10px;
       height: 34px;
-      min-width: 360px;
+      min-width: 320px;
       max-width: 56vw;
       background: #141414;
       color: #f4f4f4;
@@ -228,6 +228,39 @@
       padding: 0 10px;
       outline: none;
       margin-left: auto;
+    }
+
+    .ingest-status {
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 10px;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+      background: #121212;
+      white-space: nowrap;
+    }
+
+    .ingest-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+      box-shadow: 0 0 0 3px rgba(120,120,120,0.14);
+    }
+
+    .ingest-dot.on {
+      background: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .ingest-dot.off {
+      background: #9b4b56;
+      box-shadow: 0 0 0 3px rgba(243,108,120,0.14);
     }
 
     .messages {
@@ -468,7 +501,11 @@
         </div>
         <div class="top-controls">
           <select id="model" class="model"></select>
-                  </div>
+          <div id="ingestStatus" class="ingest-status" title="Live terminal context ingestion status">
+            <span id="ingestDot" class="ingest-dot off"></span>
+            <span id="ingestText">Ingestion: inactive</span>
+          </div>
+        </div>
       </header>
 
       <section class="messages" id="messages">
@@ -496,6 +533,9 @@
     const send = document.getElementById('send');
     const modelEl = document.getElementById('model');
     const subtitleEl = document.getElementById('subtitle');
+    const ingestStatusEl = document.getElementById('ingestStatus');
+    const ingestDotEl = document.getElementById('ingestDot');
+    const ingestTextEl = document.getElementById('ingestText');
     const scrollBottomEl = document.getElementById('scrollBottom');
     const cfgProfileEl = document.getElementById('cfgProfile');
     const cfgNameEl = document.getElementById('cfgName');
@@ -668,6 +708,22 @@
       }
     }
 
+    async function refreshContextStatus() {
+      if (!ingestStatusEl || !ingestDotEl || !ingestTextEl) return;
+      try {
+        const res = await fetch("/api/context-status");
+        const data = await res.json();
+        const active = Boolean(data.active);
+        ingestDotEl.classList.toggle("on", active);
+        ingestDotEl.classList.toggle("off", !active);
+        ingestTextEl.textContent = active ? "Ingestion: live" : "Ingestion: inactive";
+      } catch {
+        ingestDotEl.classList.remove("on");
+        ingestDotEl.classList.add("off");
+        ingestTextEl.textContent = "Ingestion: inactive";
+      }
+    }
+
     async function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
@@ -720,6 +776,8 @@
     loadSessionConfig();
     initNotes();
     loadModels();
+    refreshContextStatus();
+    setInterval(refreshContextStatus, 3000);
     autoResizeInput();
     scrollToBottom(true);
   </script>
