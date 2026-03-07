@@ -23,8 +23,6 @@ type Profile struct {
 	ROSDistro              string   `json:"ros_distro,omitempty"`
 	ROSWorkspace           string   `json:"ros_workspace,omitempty"`
 	ObsGrafanaURL          string   `json:"obs_grafana_url,omitempty"`
-	ObsPrometheusURL       string   `json:"obs_prometheus_url,omitempty"`
-	ObsLokiURL             string   `json:"obs_loki_url,omitempty"`
 	ObsSentryURL           string   `json:"obs_sentry_url,omitempty"`
 	SystemPromptProfile    string   `json:"system_prompt_profile,omitempty"`
 	NotificationPreference string   `json:"notification_preference,omitempty"`

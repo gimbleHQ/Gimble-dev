@@ -427,8 +427,6 @@ def create_app() -> Flask:
         "ros_distro": os.getenv("GIMBLE_ROS_DISTRO", ""),
         "ros_workspace": os.getenv("GIMBLE_ROS_WORKSPACE", ""),
         "obs_grafana_url": os.getenv("GIMBLE_OBS_GRAFANA_URL", ""),
-        "obs_prometheus_url": os.getenv("GIMBLE_OBS_PROMETHEUS_URL", ""),
-        "obs_loki_url": os.getenv("GIMBLE_OBS_LOKI_URL", ""),
         "obs_sentry_url": os.getenv("GIMBLE_OBS_SENTRY_URL", ""),
         "system_prompt_profile": os.getenv("GIMBLE_SYSTEM_PROMPT_PROFILE", ""),
         "notification_preference": os.getenv("GIMBLE_NOTIFICATION_PREFERENCE", ""),

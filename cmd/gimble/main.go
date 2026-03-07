@@ -638,8 +638,7 @@ func printSetupBanner() {
 	fmt.Println(styleText(border, "1;36"))
 	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;35"))
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println("Local-only configuration wizard")
-	fmt.Println("Nothing from this setup is pushed to GitHub.")
+	fmt.Println("Gimble.dev configuration wizard")
 	fmt.Println()
 }
 
@@ -689,7 +688,7 @@ func runSetupWizard() error {
 		return err
 	}
 
-	providerChoice, err := promptChoice(reader, "Code host", []string{"GitHub", "GitLab"})
+	providerChoice, err := promptChoiceInline(reader, "Code host", []string{"GitHub", "GitLab"}, 1, false)
 	if err != nil {
 		return err
 	}
@@ -709,46 +708,46 @@ func runSetupWizard() error {
 	handle = profile.NormalizeGitHub(handle)
 
 	fmt.Println()
-	printSetupSection("Experimental (Optional)")
-	workspaceRootsRaw, err := promptOptional(reader, "Workspace roots [experimental] (comma-separated, Enter to skip)")
+	printSetupSection("Experimental Settings (Optional)")
+	workspaceRootsRaw, err := promptOptional(reader, "Workspace roots (comma-separated, Enter to skip)")
 	if err != nil {
 		return err
 	}
-	rosType, err := promptOptional(reader, "ROS type [experimental] (ros1/ros2, Enter to skip)")
+	rosProfileChoice, err := promptChoiceInline(reader, "ROS profile", []string{"ROS1 / noetic", "ROS2 / humble", "ROS2 / jazzy", "ROS2 / rolling"}, 0, true)
 	if err != nil {
 		return err
 	}
-	rosDistro, err := promptOptional(reader, "ROS distro [experimental] (e.g., noetic/humble, Enter to skip)")
+	rosType := ""
+	rosDistro := ""
+	switch rosProfileChoice {
+	case 1:
+		rosType, rosDistro = "ros1", "noetic"
+	case 2:
+		rosType, rosDistro = "ros2", "humble"
+	case 3:
+		rosType, rosDistro = "ros2", "jazzy"
+	case 4:
+		rosType, rosDistro = "ros2", "rolling"
+	}
+	rosWorkspace, err := promptOptional(reader, "ROS workspace path (Enter to skip)")
 	if err != nil {
 		return err
 	}
-	rosWorkspace, err := promptOptional(reader, "ROS workspace path [experimental] (Enter to skip)")
+	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
 	if err != nil {
 		return err
 	}
-	grafanaURL, err := promptOptional(reader, "Grafana URL [experimental] (Enter to skip)")
+	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
 	if err != nil {
 		return err
 	}
-	promURL, err := promptOptional(reader, "Prometheus URL [experimental] (Enter to skip)")
+	systemPromptChoice, err := promptChoiceInline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, 0, true)
 	if err != nil {
 		return err
 	}
-	lokiURL, err := promptOptional(reader, "Loki URL [experimental] (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	sentryURL, err := promptOptional(reader, "Sentry URL [experimental] (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	systemPromptProfile, err := promptOptional(reader, "System prompt profile [experimental] (debug-heavy/concise/incident-response, Enter to skip)")
-	if err != nil {
-		return err
-	}
-	notificationPref, err := promptOptional(reader, "Chat link notification [experimental] (terminal/desktop, Enter to skip)")
-	if err != nil {
-		return err
+	systemPromptProfile := ""
+	if systemPromptChoice >= 1 && systemPromptChoice <= 3 {
+		systemPromptProfile = []string{"debug-heavy", "concise", "incident-response"}[systemPromptChoice-1]
 	}
 
 	cfg, err := profile.Load()
@@ -765,11 +764,9 @@ func runSetupWizard() error {
 		ROSDistro:              strings.TrimSpace(rosDistro),
 		ROSWorkspace:           strings.TrimSpace(rosWorkspace),
 		ObsGrafanaURL:          strings.TrimSpace(grafanaURL),
-		ObsPrometheusURL:       strings.TrimSpace(promURL),
-		ObsLokiURL:             strings.TrimSpace(lokiURL),
 		ObsSentryURL:           strings.TrimSpace(sentryURL),
 		SystemPromptProfile:    strings.TrimSpace(systemPromptProfile),
-		NotificationPreference: strings.TrimSpace(notificationPref),
+		NotificationPreference: "",
 	})
 	cfg.ActiveProfile = "default"
 	if err := profile.Save(cfg); err != nil {
@@ -844,6 +841,42 @@ func promptChoice(reader *bufio.Reader, label string, options []string) (int, er
 			return 0, err
 		}
 		v = strings.TrimSpace(v)
+		n, err := strconv.Atoi(v)
+		if err == nil && n >= 1 && n <= len(options) {
+			return n, nil
+		}
+		fmt.Println("Invalid selection.")
+	}
+}
+
+func promptChoiceInline(reader *bufio.Reader, label string, options []string, defaultChoice int, allowSkip bool) (int, error) {
+	parts := make([]string, 0, len(options))
+	for i, opt := range options {
+		parts = append(parts, fmt.Sprintf("%d=%s", i+1, opt))
+	}
+	prompt := fmt.Sprintf("%s [%s]", label, strings.Join(parts, ", "))
+	if allowSkip {
+		prompt += "; Enter=skip"
+	} else if defaultChoice >= 1 && defaultChoice <= len(options) {
+		prompt += fmt.Sprintf("; Enter=%d", defaultChoice)
+	}
+	prompt += ": "
+
+	for {
+		fmt.Print(prompt)
+		v, err := reader.ReadString('\n')
+		if err != nil {
+			return 0, err
+		}
+		v = strings.TrimSpace(v)
+		if v == "" {
+			if allowSkip {
+				return 0, nil
+			}
+			if defaultChoice >= 1 && defaultChoice <= len(options) {
+				return defaultChoice, nil
+			}
+		}
 		n, err := strconv.Atoi(v)
 		if err == nil && n >= 1 && n <= len(options) {
 			return n, nil
@@ -1245,8 +1278,6 @@ func runSession() error {
 			"GIMBLE_ROS_DISTRO="+p.ROSDistro,
 			"GIMBLE_ROS_WORKSPACE="+p.ROSWorkspace,
 			"GIMBLE_OBS_GRAFANA_URL="+p.ObsGrafanaURL,
-			"GIMBLE_OBS_PROMETHEUS_URL="+p.ObsPrometheusURL,
-			"GIMBLE_OBS_LOKI_URL="+p.ObsLokiURL,
 			"GIMBLE_OBS_SENTRY_URL="+p.ObsSentryURL,
 			"GIMBLE_SYSTEM_PROMPT_PROFILE="+p.SystemPromptProfile,
 			"GIMBLE_NOTIFICATION_PREFERENCE="+p.NotificationPreference,

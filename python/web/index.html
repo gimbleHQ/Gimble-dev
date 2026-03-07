@@ -658,8 +658,6 @@
 
         const obsLabels = [];
         if (data.obs_grafana_url) obsLabels.push('Grafana');
-        if (data.obs_prometheus_url) obsLabels.push('Prometheus');
-        if (data.obs_loki_url) obsLabels.push('Loki');
         if (data.obs_sentry_url) obsLabels.push('Sentry');
         cfgObsEl.textContent = obsLabels.length ? obsLabels.join(', ') : '-';
 
