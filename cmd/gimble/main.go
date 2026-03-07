@@ -92,11 +92,16 @@ func runSessionCommand(args []string) error {
 	switch args[0] {
 	case "chat":
 		return runPythonChat(args[1:])
-	case "exit":
-		if len(args) >= 2 && args[1] == "chat" {
-			return runExitChatCommand()
+	case "disconnect":
+		if len(args) > 1 {
+			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 		}
-		return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
+		return runExitChatCommand()
+	case "exit":
+		if len(args) > 1 {
+			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
+		}
+		return fmt.Errorf("use 'gim exit' to leave the Gimble session")
 	default:
 		return fmt.Errorf("unknown session command %q", args[0])
 	}
@@ -551,7 +556,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat       Starts the local web chat UI on an available localhost port")
-	fmt.Println("  gim exit chat  Stops the chat/tunnel while staying inside Gimble session")
+	fmt.Println("  gim disconnect Stops the chat/tunnel while staying inside Gimble session")
 	fmt.Println("                 and continues running in the background.")
 	fmt.Println()
 	fmt.Println(styleText("Try Asking", "1;33"))
@@ -1580,7 +1585,7 @@ func helpText() string {
 
 Inside a Gimble session, use:
   gim chat                   Start ChatGPT-style local chat UI server
-  gim exit chat              Stop Gimble chat/tunnel, stay in current Gimble session
+  gim disconnect             Stop Gimble chat/tunnel, stay in current Gimble session
   gim exit                   Exit the active Gimble session
 
 Profile Commands:
