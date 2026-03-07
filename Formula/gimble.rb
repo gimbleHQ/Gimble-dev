@@ -1,16 +1,16 @@
 class Gimble < Formula
   desc "Gimble CLI"
   homepage "https://github.com/Saketspradhan/Gimble-dev"
-  version "0.1.21"
-  url "https://github.com/Saketspradhan/Gimble-dev/archive/refs/tags/v0.1.21.tar.gz"
-  sha256 "5e0d93a362eb587e4a5d8a646b01676f4fdaa070b597f25168fdacbea3512a8f"
+  version "0.1.22"
+  url "https://github.com/Saketspradhan/Gimble-dev/archive/refs/tags/v0.1.22.tar.gz"
+  sha256 "bbaf277f011d9d9186d9e82711863282421fdca32247c8cf47636c2201f9522e"
   license "MIT"
 
   depends_on "go" => :build
   depends_on "python@3.12"
 
   def install
-    system "go", "build", "-ldflags", "-X main.version=0.1.21", "-o", bin/"gimble", "./cmd/gimble"
+    system "go", "build", "-ldflags", "-X main.version=0.1.22", "-o", bin/"gimble", "./cmd/gimble"
     pkgshare.install "python"
   end
 
