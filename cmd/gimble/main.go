@@ -101,7 +101,7 @@ func runSessionCommand(args []string) error {
 		if len(args) > 1 {
 			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 		}
-		return fmt.Errorf("use 'gim exit' to leave the Gimble session")
+		return runExitSessionCommand()
 	default:
 		return fmt.Errorf("unknown session command %q", args[0])
 	}
@@ -115,6 +115,20 @@ func runExitChatCommand() error {
 		return err
 	}
 	fmt.Println("Gimble Chat Agent stopped. You are still inside Gimble session.")
+	return nil
+}
+
+func runExitSessionCommand() error {
+	// Fail-safe: always stop chat/tunnel + ingestion before exiting session shell.
+	if err := runExitChatCommand(); err != nil {
+		return err
+	}
+	ppid := os.Getppid()
+	if err := syscall.Kill(ppid, syscall.SIGHUP); err != nil {
+		if err2 := syscall.Kill(ppid, syscall.SIGTERM); err2 != nil {
+			return fmt.Errorf("failed to exit Gimble session: %v", err2)
+		}
+	}
 	return nil
 }
 
@@ -1549,7 +1563,7 @@ func createSessionShimDir() (cleanup func(), shimDir string, err error) {
 		return func() {}, "", err
 	}
 
-	gimScript := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = \"exit\" ]; then\n  kill -HUP \"$PPID\" >/dev/null 2>&1 || kill -TERM \"$PPID\" >/dev/null 2>&1\n  exit 0\nfi\nexec %q __session_cmd \"$@\"\n", exe)
+	gimScript := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = \"exit\" ]; then\n  exec %q __session_cmd exit\nfi\nexec %q __session_cmd \"$@\"\n", exe, exe)
 	gimPath := filepath.Join(dir, "gim")
 	if err := os.WriteFile(gimPath, []byte(gimScript), 0o755); err != nil {
 		_ = os.RemoveAll(dir)

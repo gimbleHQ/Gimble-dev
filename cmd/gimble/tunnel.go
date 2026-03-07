@@ -66,6 +66,9 @@ func stopPreviousChatTunnel() error {
 		}
 		_ = killProcessGroupOrPID(state.PID, syscall.SIGKILL)
 	}
+	if err := unregisterPublicSession(state); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to unregister public session %s/%s: %v\n", state.Username, state.SessionID, err)
+	}
 	_ = clearTunnelState()
 	return nil
 }
@@ -287,6 +290,67 @@ func registerPublicSession(endpoint string, info *publicTunnelInfo) error {
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	if strings.TrimSpace(out.PublicURL) != "" {
 		info.PublicURL = strings.TrimSpace(out.PublicURL)
+	}
+	return nil
+}
+
+func unregisterPublicSession(state tunnelState) error {
+	username := strings.TrimSpace(strings.ToLower(state.Username))
+	sessionID := strings.TrimSpace(strings.ToLower(state.SessionID))
+	if username == "" || sessionID == "" {
+		return nil
+	}
+
+	baseURL := strings.TrimRight(chatBrokerSetting("GIMBLE_CHAT_PUBLIC_BASE", defaultPublicChatBaseURL), "/")
+	endpoint := chatBrokerSetting("GIMBLE_CHAT_BROKER_UNREGISTER_ENDPOINT", baseURL+"/api/unregister")
+	payload := map[string]any{"username": username, "session_id": sessionID}
+	body, _ := json.Marshal(payload)
+
+	if _, err := exec.LookPath("curl"); err == nil {
+		cmd := exec.Command(
+			"curl",
+			"-sS",
+			"-A", "Mozilla/5.0 (Gimble; +https://gimble.dev)",
+			"-H", "Content-Type: application/json",
+			"-H", "Accept: application/json",
+			"--max-time", "6",
+			"--data", string(body),
+			"--write-out", "\n%{http_code}",
+			endpoint,
+		)
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			raw := strings.TrimSpace(string(out))
+			idx := strings.LastIndex(raw, "\n")
+			if idx > -1 {
+				statusCode := strings.TrimSpace(raw[idx+1:])
+				if len(statusCode) == 3 && (statusCode[0] == '2' || statusCode == "404") {
+					return nil
+				}
+				respBody := strings.TrimSpace(raw[:idx])
+				return fmt.Errorf("broker unregister failed: %s (%s)", statusCode, respBody)
+			}
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Gimble; +https://gimble.dev)")
+	resp, err := (&http.Client{Timeout: 6 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		return fmt.Errorf("broker unregister failed: %s (%s)", resp.Status, strings.TrimSpace(string(raw)))
 	}
 	return nil
 }

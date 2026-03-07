@@ -99,6 +99,38 @@ async function doGetSession(env, key) {
   return JSON.parse(raw);
 }
 
+function parseUnregisterPayload(payload) {
+  if (!payload) {
+    throw new Error("invalid payload");
+  }
+
+  const username = String(payload.username || "").toLowerCase();
+  const sessionId = String(payload.session_id || "").toLowerCase();
+  if (!USER_RE.test(username) || !SESSION_RE.test(sessionId)) {
+    throw new Error("invalid unregister fields");
+  }
+
+  return { key: `${username}/${sessionId}` };
+}
+
+async function doDeleteSession(env, key) {
+  if (env.SESSION_BROKER) {
+    const id = env.SESSION_BROKER.idFromName("broker");
+    const stub = env.SESSION_BROKER.get(id);
+    const resp = await stub.fetch("https://do/session/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    return;
+  }
+
+  if (env.SESSIONS) {
+    await env.SESSIONS.delete(key);
+  }
+}
+
 export class SessionBroker {
   constructor(state) {
     this.state = state;
@@ -141,6 +173,15 @@ export class SessionBroker {
       return Response.json(value);
     }
 
+
+    if (request.method === "POST" && url.pathname === "/session/delete") {
+      const payload = await request.json().catch(() => null);
+      if (!payload || !payload.key) {
+        return new Response("invalid payload", { status: 400 });
+      }
+      await this.state.storage.delete(String(payload.key));
+      return Response.json({ ok: true });
+    }
     return new Response("not found", { status: 404 });
   }
 }
@@ -148,6 +189,19 @@ export class SessionBroker {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (request.method === "POST" && url.pathname === "/api/unregister") {
+      const payload = await request.json().catch(() => null);
+      let parsed;
+      try {
+        parsed = parseUnregisterPayload(payload);
+      } catch (err) {
+        return new Response(String(err.message || "invalid payload"), { status: 400 });
+      }
+
+      await doDeleteSession(env, parsed.key);
+      return Response.json({ ok: true, key: parsed.key });
+    }
 
     if (request.method === "POST" && url.pathname === "/api/register") {
       const payload = await request.json().catch(() => null);
