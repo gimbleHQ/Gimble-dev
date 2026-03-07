@@ -422,6 +422,16 @@ def create_app() -> Flask:
         "name": os.getenv("GIMBLE_USER_NAME", ""),
         "email": os.getenv("GIMBLE_USER_EMAIL", ""),
         "github": os.getenv("GIMBLE_USER_GITHUB", ""),
+        "workspace_roots": [x.strip() for x in os.getenv("GIMBLE_WORKSPACE_ROOTS", "").split(",") if x.strip()],
+        "ros_type": os.getenv("GIMBLE_ROS_TYPE", ""),
+        "ros_distro": os.getenv("GIMBLE_ROS_DISTRO", ""),
+        "ros_workspace": os.getenv("GIMBLE_ROS_WORKSPACE", ""),
+        "obs_grafana_url": os.getenv("GIMBLE_OBS_GRAFANA_URL", ""),
+        "obs_prometheus_url": os.getenv("GIMBLE_OBS_PROMETHEUS_URL", ""),
+        "obs_loki_url": os.getenv("GIMBLE_OBS_LOKI_URL", ""),
+        "obs_sentry_url": os.getenv("GIMBLE_OBS_SENTRY_URL", ""),
+        "system_prompt_profile": os.getenv("GIMBLE_SYSTEM_PROMPT_PROFILE", ""),
+        "notification_preference": os.getenv("GIMBLE_NOTIFICATION_PREFERENCE", ""),
     }
 
     @app.get("/")

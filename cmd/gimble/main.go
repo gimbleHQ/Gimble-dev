@@ -89,9 +89,25 @@ func runSessionCommand(args []string) error {
 	switch args[0] {
 	case "chat":
 		return runPythonChat(args[1:])
+	case "exit":
+		if len(args) >= 2 && args[1] == "chat" {
+			return runExitChatCommand()
+		}
+		return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 	default:
 		return fmt.Errorf("unknown session command %q", args[0])
 	}
+}
+
+func runExitChatCommand() error {
+	if err := stopAndClearChatServer(); err != nil {
+		return err
+	}
+	if err := stopPreviousChatTunnel(); err != nil {
+		return err
+	}
+	fmt.Println("Gimble Chat Agent stopped. You are still inside Gimble session.")
+	return nil
 }
 
 func runPythonChat(args []string) error {
@@ -104,7 +120,11 @@ func runPythonChat(args []string) error {
 	if *port < 0 || *port > 65535 {
 		return fmt.Errorf("invalid port: %d", *port)
 	}
-	if err := stopPreviousChatServer(); err != nil {
+	if existingURL := activeChatPublicURL(); existingURL != "" {
+		fmt.Printf("Gimble Chat Agent is already running. Reuse this live link: %s\n", makeHyperlink(existingURL))
+		return nil
+	}
+	if err := stopAndClearChatServer(); err != nil {
 		return err
 	}
 	if err := stopPreviousChatTunnel(); err != nil {
@@ -191,6 +211,37 @@ func runPythonChat(args []string) error {
 	return nil
 }
 
+func isPIDAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	err := syscall.Kill(pid, 0)
+	return err == nil || err == syscall.EPERM
+}
+
+func activeChatPublicURL() string {
+	s, err := loadChatServerState()
+	if err != nil {
+		return ""
+	}
+	if !isPIDAlive(s.PID) {
+		_ = clearChatServerState()
+		_ = clearTunnelState()
+		return ""
+	}
+	t, err := loadTunnelState()
+	if err != nil {
+		return ""
+	}
+	if u := strings.TrimSpace(t.PublicURL); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(t.TunnelURL); u != "" {
+		return u
+	}
+	return ""
+}
+
 type chatServerState struct {
 	PID       int    `json:"pid"`
 	UpdatedAt string `json:"updated_at"`
@@ -241,6 +292,25 @@ func saveChatServerState(pid int) error {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write chat server state: %w", err)
 	}
+	return nil
+}
+
+func clearChatServerState() error {
+	path, err := chatServerStatePath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func stopAndClearChatServer() error {
+	if err := stopPreviousChatServer(); err != nil {
+		return err
+	}
+	_ = clearChatServerState()
 	return nil
 }
 
@@ -444,12 +514,12 @@ func runTunnelSpinner(stop <-chan struct{}, done chan<- struct{}, label string) 
 func printSessionIntro(activeName string, p profile.Profile) {
 	border := "=============================================================="
 	title := []string{
-		"   ██████╗ ██╗███╗   ███╗██████╗ ██╗     ███████╗",
-		"  ██╔════╝ ██║████╗ ████║██╔══██╗██║     ██╔════╝",
-		"  ██║  ███╗██║██╔████╔██║██████╔╝██║     █████╗",
-		"  ██║   ██║██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝",
-		"  ╚██████╔╝██║██║ ╚═╝ ██║██████╔╝███████╗███████╗",
-		"   ╚═════╝ ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝",
+		"   ██████╗  ██╗ ███╗   ███╗ ██████╗  ██╗      ███████╗",
+		"  ██╔════╝  ██║ ████╗ ████║ ██╔══██╗ ██║      ██╔════╝",
+		"  ██║  ███╗ ██║ ██╔████╔██║ ██████╔╝ ██║      █████╗",
+		"  ██║   ██║ ██║ ██║╚██╔╝██║ ██╔══██╗ ██║      ██╔══╝",
+		"  ╚██████╔╝ ██║ ██║ ╚═╝ ██║ ██████╔╝ ███████╗ ███████╗",
+		"   ╚═════╝  ╚═╝ ╚═╝     ╚═╝ ╚═════╝  ╚══════╝ ╚══════╝",
 	}
 
 	fmt.Println()
@@ -473,13 +543,13 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println(styleText("Capabilities", "1;33"))
 	fmt.Println("  - Runtime log analysis")
 	fmt.Println("  - ROS graph inspection")
-	fmt.Println("  - Core dump investigation")
 	fmt.Println("  - Deployment history tracing")
 	fmt.Println("  - Fleet anomaly detection")
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
-	fmt.Println("  gim chat    Starts the local web chat UI on an available localhost port")
-	fmt.Println("              and continues running in the background.")
+	fmt.Println("  gim chat       Starts the local web chat UI on an available localhost port")
+	fmt.Println("  gim exit chat  Stops the chat/tunnel while staying inside Gimble session")
+	fmt.Println("                 and continues running in the background.")
 	fmt.Println()
 	fmt.Println(styleText("Try Asking", "1;33"))
 	fmt.Println("  > why did the perception pipeline crash?")
@@ -545,11 +615,15 @@ func installPythonRuntimeDuringSetup() error {
 
 	fmt.Println("Installing Python chat runtime (one-time setup)...")
 	cmd := exec.Command("sh", setupScript)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to install python runtime: %w", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		if trimmed == "" {
+			trimmed = err.Error()
+		}
+		return fmt.Errorf("failed to install python runtime: %s", trimmed)
 	}
+	fmt.Println("Python chat runtime is ready.")
 
 	pythonExe, err := findPythonInterpreter()
 	if err != nil {
@@ -559,14 +633,40 @@ func installPythonRuntimeDuringSetup() error {
 	return err
 }
 
+func printSetupBanner() {
+	border := "=============================================================="
+	fmt.Println(styleText(border, "1;36"))
+	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;35"))
+	fmt.Println(styleText(border, "1;36"))
+	fmt.Println("Local-only configuration wizard")
+	fmt.Println("Nothing from this setup is pushed to GitHub.")
+	fmt.Println()
+}
+
+func printSetupSection(title string) {
+	fmt.Println(styleText(title, "1;33"))
+}
+
+func parseCSVList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 func runSetupWizard() error {
 	if !isInteractiveTerminal() {
 		return fmt.Errorf("setup requires an interactive terminal")
 	}
 
-	fmt.Println("Gimble first-time setup")
-	fmt.Println("This wizard stores config locally on your machine.")
-	fmt.Println()
+	printSetupBanner()
+	printSetupSection("Profile")
 
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
@@ -576,12 +676,12 @@ func runSetupWizard() error {
 
 	reader := bufio.NewReader(tty)
 
-	name, err := promptRequired(reader, "Name")
+	name, err := promptRequired(reader, "Full name")
 	if err != nil {
 		return err
 	}
 
-	email, err := promptRequired(reader, "Email")
+	email, err := promptRequired(reader, "Email address")
 	if err != nil {
 		return err
 	}
@@ -589,7 +689,7 @@ func runSetupWizard() error {
 		return err
 	}
 
-	providerChoice, err := promptChoice(reader, "Account provider", []string{"GitHub", "GitLab"})
+	providerChoice, err := promptChoice(reader, "Code host", []string{"GitHub", "GitLab"})
 	if err != nil {
 		return err
 	}
@@ -608,15 +708,68 @@ func runSetupWizard() error {
 	}
 	handle = profile.NormalizeGitHub(handle)
 
+	fmt.Println()
+	printSetupSection("Experimental (Optional)")
+	workspaceRootsRaw, err := promptOptional(reader, "Workspace roots [experimental] (comma-separated, Enter to skip)")
+	if err != nil {
+		return err
+	}
+	rosType, err := promptOptional(reader, "ROS type [experimental] (ros1/ros2, Enter to skip)")
+	if err != nil {
+		return err
+	}
+	rosDistro, err := promptOptional(reader, "ROS distro [experimental] (e.g., noetic/humble, Enter to skip)")
+	if err != nil {
+		return err
+	}
+	rosWorkspace, err := promptOptional(reader, "ROS workspace path [experimental] (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	grafanaURL, err := promptOptional(reader, "Grafana URL [experimental] (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	promURL, err := promptOptional(reader, "Prometheus URL [experimental] (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	lokiURL, err := promptOptional(reader, "Loki URL [experimental] (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	sentryURL, err := promptOptional(reader, "Sentry URL [experimental] (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	systemPromptProfile, err := promptOptional(reader, "System prompt profile [experimental] (debug-heavy/concise/incident-response, Enter to skip)")
+	if err != nil {
+		return err
+	}
+	notificationPref, err := promptOptional(reader, "Chat link notification [experimental] (terminal/desktop, Enter to skip)")
+	if err != nil {
+		return err
+	}
+
 	cfg, err := profile.Load()
 	if err != nil {
 		return err
 	}
 	cfg.Upsert("default", profile.Profile{
-		Name:     strings.TrimSpace(name),
-		Email:    strings.TrimSpace(email),
-		GitHub:   handle,
-		Provider: profile.NormalizeProvider(provider),
+		Name:                   strings.TrimSpace(name),
+		Email:                  strings.TrimSpace(email),
+		GitHub:                 handle,
+		Provider:               profile.NormalizeProvider(provider),
+		WorkspaceRoots:         parseCSVList(workspaceRootsRaw),
+		ROSType:                strings.ToLower(strings.TrimSpace(rosType)),
+		ROSDistro:              strings.TrimSpace(rosDistro),
+		ROSWorkspace:           strings.TrimSpace(rosWorkspace),
+		ObsGrafanaURL:          strings.TrimSpace(grafanaURL),
+		ObsPrometheusURL:       strings.TrimSpace(promURL),
+		ObsLokiURL:             strings.TrimSpace(lokiURL),
+		ObsSentryURL:           strings.TrimSpace(sentryURL),
+		SystemPromptProfile:    strings.TrimSpace(systemPromptProfile),
+		NotificationPreference: strings.TrimSpace(notificationPref),
 	})
 	cfg.ActiveProfile = "default"
 	if err := profile.Save(cfg); err != nil {
@@ -624,7 +777,7 @@ func runSetupWizard() error {
 	}
 
 	fmt.Println()
-	fmt.Println("API key setup (optional, can be added later)")
+	printSetupSection("Model Providers (Optional)")
 	fmt.Println("OpenAI key: https://platform.openai.com/api-keys")
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
@@ -640,16 +793,18 @@ func runSetupWizard() error {
 		return err
 	}
 
+	fmt.Println()
+	printSetupSection("Runtime")
 	if err := installPythonRuntimeDuringSetup(); err != nil {
 		return err
 	}
 
 	chatPath, _ := chatEnvPath()
 	fmt.Println()
-	fmt.Printf("Setup complete. Active profile: default (%s, %s:@%s).\n", email, provider, handle)
+	printSetupSection("Setup Complete")
+	fmt.Printf("Active profile: default (%s, %s:@%s).\n", email, provider, handle)
 	fmt.Printf("Local secrets file: %s\n", chatPath)
 	fmt.Println("Keys are stored locally with user-only permissions and are never pushed by Gimble.")
-	fmt.Println("You can now run: gimble")
 	return nil
 }
 
@@ -1085,6 +1240,16 @@ func runSession() error {
 			"GIMBLE_USER_EMAIL="+p.Email,
 			"GIMBLE_USER_GITHUB="+p.GitHub,
 			"GIMBLE_USER_ACCOUNT_PROVIDER="+profileAccountProvider(p),
+			"GIMBLE_WORKSPACE_ROOTS="+strings.Join(p.WorkspaceRoots, ","),
+			"GIMBLE_ROS_TYPE="+p.ROSType,
+			"GIMBLE_ROS_DISTRO="+p.ROSDistro,
+			"GIMBLE_ROS_WORKSPACE="+p.ROSWorkspace,
+			"GIMBLE_OBS_GRAFANA_URL="+p.ObsGrafanaURL,
+			"GIMBLE_OBS_PROMETHEUS_URL="+p.ObsPrometheusURL,
+			"GIMBLE_OBS_LOKI_URL="+p.ObsLokiURL,
+			"GIMBLE_OBS_SENTRY_URL="+p.ObsSentryURL,
+			"GIMBLE_SYSTEM_PROMPT_PROFILE="+p.SystemPromptProfile,
+			"GIMBLE_NOTIFICATION_PREFERENCE="+p.NotificationPreference,
 		)
 		promptPrefix = "gimble:" + activeName
 		printSessionIntro(activeName, p)
@@ -1289,6 +1454,7 @@ func helpText() string {
 
 Inside a Gimble session, use:
   gim chat                   Start ChatGPT-style local chat UI server
+  gim exit chat              Stop Gimble chat/tunnel, stay in current Gimble session
   gim exit                   Exit the active Gimble session
 
 Profile Commands:

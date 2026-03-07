@@ -14,10 +14,20 @@ const appDir = "gimble"
 const configFile = "config.json"
 
 type Profile struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	GitHub   string `json:"github"`
-	Provider string `json:"provider,omitempty"`
+	Name                   string   `json:"name"`
+	Email                  string   `json:"email"`
+	GitHub                 string   `json:"github"`
+	Provider               string   `json:"provider,omitempty"`
+	WorkspaceRoots         []string `json:"workspace_roots,omitempty"`
+	ROSType                string   `json:"ros_type,omitempty"`
+	ROSDistro              string   `json:"ros_distro,omitempty"`
+	ROSWorkspace           string   `json:"ros_workspace,omitempty"`
+	ObsGrafanaURL          string   `json:"obs_grafana_url,omitempty"`
+	ObsPrometheusURL       string   `json:"obs_prometheus_url,omitempty"`
+	ObsLokiURL             string   `json:"obs_loki_url,omitempty"`
+	ObsSentryURL           string   `json:"obs_sentry_url,omitempty"`
+	SystemPromptProfile    string   `json:"system_prompt_profile,omitempty"`
+	NotificationPreference string   `json:"notification_preference,omitempty"`
 }
 
 type Config struct {

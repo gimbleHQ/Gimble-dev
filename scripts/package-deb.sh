@@ -35,6 +35,7 @@ Section: utils
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: Gimble Team <dev@gimble.dev>
+Depends: python3, python3-venv
 Description: Gimble CLI
  Gimble command-line tool.
 CONTROL

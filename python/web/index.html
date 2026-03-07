@@ -482,6 +482,26 @@
           <div class="cfg-label">GitHub</div>
           <div class="cfg-val" id="cfgGithub">-</div>
         </div>
+        <div class="cfg-row">
+          <div class="cfg-label">Roots [exp]</div>
+          <div class="cfg-val" id="cfgRoots">-</div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label">ROS [exp]</div>
+          <div class="cfg-val" id="cfgRos">-</div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label">Obs [exp]</div>
+          <div class="cfg-val" id="cfgObs">-</div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label">Prompt [exp]</div>
+          <div class="cfg-val" id="cfgPrompt">-</div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label">Notify [exp]</div>
+          <div class="cfg-val" id="cfgNotify">-</div>
+        </div>
       </div>
 
       <div class="notes-wrap">
@@ -541,6 +561,11 @@
     const cfgNameEl = document.getElementById('cfgName');
     const cfgEmailEl = document.getElementById('cfgEmail');
     const cfgGithubEl = document.getElementById('cfgGithub');
+    const cfgRootsEl = document.getElementById('cfgRoots');
+    const cfgRosEl = document.getElementById('cfgRos');
+    const cfgObsEl = document.getElementById('cfgObs');
+    const cfgPromptEl = document.getElementById('cfgPrompt');
+    const cfgNotifyEl = document.getElementById('cfgNotify');
     const notesEl = document.getElementById('notes');
     const copyNotesEl = document.getElementById('copyNotes');
 
@@ -624,11 +649,32 @@
         cfgNameEl.textContent = data.name || '-';
         cfgEmailEl.textContent = data.email || '-';
         cfgGithubEl.textContent = data.github ? `@${data.github}` : '-';
+
+        const roots = Array.isArray(data.workspace_roots) ? data.workspace_roots : [];
+        cfgRootsEl.textContent = roots.length ? roots.join(', ') : '-';
+
+        const rosBits = [data.ros_type, data.ros_distro, data.ros_workspace].filter(Boolean);
+        cfgRosEl.textContent = rosBits.length ? rosBits.join(' | ') : '-';
+
+        const obsLabels = [];
+        if (data.obs_grafana_url) obsLabels.push('Grafana');
+        if (data.obs_prometheus_url) obsLabels.push('Prometheus');
+        if (data.obs_loki_url) obsLabels.push('Loki');
+        if (data.obs_sentry_url) obsLabels.push('Sentry');
+        cfgObsEl.textContent = obsLabels.length ? obsLabels.join(', ') : '-';
+
+        cfgPromptEl.textContent = data.system_prompt_profile || '-';
+        cfgNotifyEl.textContent = data.notification_preference || '-';
       } catch {
         cfgProfileEl.textContent = '-';
         cfgNameEl.textContent = '-';
         cfgEmailEl.textContent = '-';
         cfgGithubEl.textContent = '-';
+        cfgRootsEl.textContent = '-';
+        cfgRosEl.textContent = '-';
+        cfgObsEl.textContent = '-';
+        cfgPromptEl.textContent = '-';
+        cfgNotifyEl.textContent = '-';
       }
     }
 
