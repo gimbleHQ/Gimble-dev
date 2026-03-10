@@ -753,6 +753,27 @@ func runSetupWizard() error {
 	return nil
 }
 
+func runKeysWizard() error {
+	if !isInteractiveTerminal() {
+		return fmt.Errorf("keys update requires an interactive terminal")
+	}
+	printSetupSection("Model Providers (Optional)")
+	reader := bufio.NewReader(os.Stdin)
+	openAIKey, err := promptOptional(reader, "OPENAI_API_KEY (press Enter to keep current)")
+	if err != nil {
+		return err
+	}
+	groqKey, err := promptOptional(reader, "GROQ_API_KEY (press Enter to keep current)")
+	if err != nil {
+		return err
+	}
+	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
+		return err
+	}
+	fmt.Println("API keys updated.")
+	return nil
+}
+
 func promptRequired(reader *bufio.Reader, label string) (string, error) {
 	for {
 		fmt.Printf("%s: ", label)
