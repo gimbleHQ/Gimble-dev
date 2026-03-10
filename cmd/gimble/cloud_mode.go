@@ -174,6 +174,91 @@ func buildSessionConfig() map[string]string {
 	return cfg
 }
 
+type googleDeviceStartResp struct {
+	VerificationURL string `json:"verification_url"`
+	UserCode        string `json:"user_code"`
+	DeviceCode      string `json:"device_code"`
+	Interval        int    `json:"interval"`
+	ExpiresIn       int    `json:"expires_in"`
+}
+
+type googleDevicePollResp struct {
+	Status string `json:"status"`
+	Email  string `json:"email"`
+}
+
+func googleDeviceFlow(apiBase, token, userID, username string) error {
+	endpoint := strings.TrimRight(apiBase, "/") + "/v1/auth/google/device"
+	payload := map[string]string{"user_id": userID, "username": username}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(token) != "" {
+		req.Header.Set("X-Gimble-Token", token)
+	}
+	req.Header.Set("X-Gimble-Device", cloudDeviceID())
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("google device start failed: %s", resp.Status)
+	}
+	var start googleDeviceStartResp
+	if err := json.NewDecoder(resp.Body).Decode(&start); err != nil {
+		return err
+	}
+	fmt.Println("\nGoogle sign-in required for additional security.")
+	fmt.Printf("Open: %s\n", start.VerificationURL)
+	fmt.Printf("Enter code: %s\n\n", start.UserCode)
+
+	pollEndpoint := strings.TrimRight(apiBase, "/") + "/v1/auth/google/poll"
+	deadline := time.Now().Add(time.Duration(start.ExpiresIn) * time.Second)
+	interval := time.Duration(start.Interval) * time.Second
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	for time.Now().Before(deadline) {
+		time.Sleep(interval)
+		body, _ := json.Marshal(map[string]string{"user_id": userID})
+		preq, err := http.NewRequest(http.MethodPost, pollEndpoint, bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		preq.Header.Set("Content-Type", "application/json")
+		if strings.TrimSpace(token) != "" {
+			preq.Header.Set("X-Gimble-Token", token)
+		}
+		preq.Header.Set("X-Gimble-Device", cloudDeviceID())
+		presp, err := (&http.Client{Timeout: 10 * time.Second}).Do(preq)
+		if err != nil {
+			return err
+		}
+		var out googleDevicePollResp
+		_ = json.NewDecoder(presp.Body).Decode(&out)
+		_ = presp.Body.Close()
+		if out.Status == "verified" {
+			if strings.TrimSpace(out.Email) != "" {
+				fmt.Printf("Google verified: %s\n", out.Email)
+			} else {
+				fmt.Println("Google verified.")
+			}
+			return nil
+		}
+		if out.Status == "expired" {
+			return fmt.Errorf("google device code expired")
+		}
+		if out.Status == "error" {
+			return fmt.Errorf("google verification failed")
+		}
+	}
+	return fmt.Errorf("google verification timed out")
+}
+
 func sendIngestHeartbeat(ingestURL, token, sessionID, userID string) error {
 	if ingestURL == "" {
 		return nil
