@@ -59,9 +59,9 @@ On first launch, Gimble runs an interactive setup wizard and stores local config
 
 Inside a Gimble session, use:
 
-- `gim chat` start chat server + public link
-- `gim disconnect` stop chat/tunnel and ingestion, stay in Gimble session
-- `gim exit` stop chat/tunnel (fail-safe) and exit Gimble session
+- `gim chat` start Gimble Cloud session + uploader
+- `gim disconnect` stop uploader, stay in Gimble session
+- `gim exit` stop uploader (fail-safe) and exit Gimble session
 
 ## Chat Models
 
@@ -75,21 +75,11 @@ Available in UI:
 - OpenAI: `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-4.1-nano`
 - `GPT-Q 4K` is shown as experimental placeholder (non-selectable)
 
-## Public Chat Tunnel
+## Cloud Mode (Gimble Cloud Backend)
 
-`gim chat` can expose your local session as:
+Gimble uses your private Gimble Cloud backend where chat + context compilation live.
 
-`https://chat.gimble.dev/<username>/<session_id>`
-
-Broker/worker code is in:
-
-- `infra/chat-broker/`
-
-## Cloud SaaS Mode (Private Backend)
-
-Gimble can run in cloud mode where chat + context compilation live on your private backend.
-
-Set in local `chat.env`:
+Set in local `chat.env` (required):
 
 ```env
 GIMBLE_CLOUD_API_BASE=https://chat.gimble.dev
@@ -106,6 +96,21 @@ Private backend scaffold is at:
 
 - `/Users/saketpradhan/Desktop/gimble-cloud`
 
+
+### Gimble Cloud Backend (What Happens in the Cloud)
+
+Gimble Cloud runs the proprietary backend that powers chat and retrieval. It is not open-source.
+At a high level, the pipeline is:
+
+- **Ingest**: The CLI uploads sanitized session logs to `/v1/events:ingest`.
+- **Normalize + Store**: Events are normalized, stored in Postgres, and recent events are cached in Redis.
+- **Index (pgvector)**: Semantic search index for retrieval.
+- **Index (Meilisearch)**: Keyword search index for retrieval.
+- **Summaries + Anomalies**: Workers generate summaries and anomaly signals and store them in Postgres and Redis.
+- **Context Compiler**: Combines recent events + summaries + vector matches + keyword matches into a compact prompt.
+- **LLM**: Groq (`gpt-oss-120b`) answers using that structured context.
+
+This design keeps the client lightweight while the cloud handles scalable ingestion and retrieval.
 
 ## Updating Gimble
 

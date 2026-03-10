@@ -39,7 +39,7 @@ func run(args []string) error {
 		return err
 	}
 	if err := ensureChatBrokerEnvDefaults(); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to initialize chat broker defaults: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: failed to initialize chat env defaults: %v\n", err)
 	}
 
 	inSession := os.Getenv("GIMBLE_SESSION") == "1"
@@ -119,7 +119,7 @@ func runExitChatCommand() error {
 }
 
 func runExitSessionCommand() error {
-	// Fail-safe: always stop chat/tunnel + ingestion before exiting session shell.
+	// Fail-safe: always stop cloud uploader + ingestion before exiting session shell.
 	if err := runExitChatCommand(); err != nil {
 		return err
 	}
@@ -135,106 +135,13 @@ func runExitSessionCommand() error {
 func runPythonChat(args []string) error {
 	fs := flag.NewFlagSet("chat", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	port := fs.Int("port", 0, "preferred port (0 for auto)")
+	_ = fs.Int("port", 0, "preferred port (unused in cloud mode)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *port < 0 || *port > 65535 {
-		return fmt.Errorf("invalid port: %d", *port)
-	}
-	if shouldUseCloudMode() {
-		return runCloudChat()
-	}
-	if existingURL := activeChatPublicURL(); existingURL != "" {
-		fmt.Printf("Gimble Chat Agent is already running. Reuse this live link: %s\n", makeHyperlink(existingURL))
-		return nil
-	}
-	if err := stopAndClearChatServer(); err != nil {
-		return err
-	}
-	if err := stopPreviousChatTunnel(); err != nil {
-		return err
-	}
-
-	pythonExe, err := findPythonInterpreter()
-	if err != nil {
-		return err
-	}
-
-	scriptPath, err := findPythonChatServerScript()
-	if err != nil {
-		return err
-	}
-
-	pythonExe, err = ensurePythonChatRuntime(pythonExe, scriptPath)
-	if err != nil {
-		return err
-	}
-
-	ln, actualPort, err := listenWithFallback(*port)
-	if err != nil {
-		return err
-	}
-	_ = ln.Close()
-
-	loopbackURL := fmt.Sprintf("http://127.0.0.1:%d", actualPort)
-
-	cmd := exec.Command(pythonExe, scriptPath, "--port", strconv.Itoa(actualPort))
-	cmd.Stdin = nil
-	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1", "GIMBLE_SESSION_SHELL_PID="+strconv.Itoa(os.Getppid()))
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	logFile, logPath, err := openChatServerLogFile()
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-
-	if err := cmd.Start(); err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to start python chat server: %w", err)
-	}
-	pid := cmd.Process.Pid
-	if err := saveChatServerState(pid); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to persist chat server state: %v\n", err)
-	}
-	_ = cmd.Process.Release()
-	_ = logFile.Close()
-
-	if err := waitForChatServerReady(actualPort, pid, 5*time.Second); err != nil {
-		_ = syscall.Kill(-pid, syscall.SIGTERM)
-		return fmt.Errorf("chat server failed to start: %w\nCheck logs: %s\nIf needed, run: %s", err, logPath, runtimeSetupHint(scriptPath))
-	}
-
-	fmt.Println("✓ Starting Gimble chat server")
-	fmt.Printf("✓ Local server running at %s (developer only)\n", makeHyperlink(loopbackURL))
-
-	stopSpinner := make(chan struct{})
-	doneSpinner := make(chan struct{})
-	go runTunnelSpinner(stopSpinner, doneSpinner, "Preparing public chat URL")
-
-	tunnelInfo, tunnelErr := startPublicChatTunnel(actualPort)
-	close(stopSpinner)
-	<-doneSpinner
-	fmt.Print("\r\x1b[2K")
-
-	if tunnelErr != nil {
-		fmt.Printf("Chat with Gimble Agents at: %s (local fallback)\n", makeHyperlink(loopbackURL))
-		fmt.Printf("Note: public tunnel unavailable: %v\n", tunnelErr)
-		return nil
-	}
-
-	fmt.Printf("Chat with Gimble Agents at: %s\n", makeHyperlink(tunnelInfo.PublicURL))
-	if tunnelInfo.BrokerEnabled && strings.TrimSpace(tunnelInfo.BrokerError) != "" {
-		fmt.Printf("(Temporary fallback while route warms up) %s\n", makeHyperlink(tunnelInfo.TunnelURL))
-	}
-	if !tunnelInfo.BrokerEnabled && strings.TrimSpace(tunnelInfo.TunnelURL) != "" {
-		fmt.Printf("(Fallback direct tunnel) %s\n", makeHyperlink(tunnelInfo.TunnelURL))
-	}
-
-	return nil
+	return runCloudChat()
 }
+
 
 func isPIDAlive(pid int) bool {
 	if pid <= 0 {
@@ -573,7 +480,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat       Starts the local web chat UI on an available localhost port")
-	fmt.Println("  gim disconnect Stops the chat/tunnel while staying inside Gimble session")
+	fmt.Println("  gim disconnect Stops the cloud uploader while staying inside Gimble session")
 	fmt.Println("                 and continues running in the background.")
 	fmt.Println()
 	fmt.Println(styleText("Try Asking", "1;33"))
@@ -811,15 +718,23 @@ func runSetupWizard() error {
 		return err
 	}
 
-	if err := upsertChatEnv(openAIKey, groqKey); err != nil {
+	fmt.Println()
+	printSetupSection("Cloud Backend")
+	fmt.Println("Gimble Cloud API base (default https://chat.gimble.dev)")
+	cloudBase, err := promptOptional(reader, "GIMBLE_CLOUD_API_BASE (press Enter for default)")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(cloudBase) == "" {
+		cloudBase = defaultCloudAPIBase
+	}
+	cloudToken, err := promptOptional(reader, "GIMBLE_CLOUD_API_TOKEN (required for cloud mode)")
+	if err != nil {
 		return err
 	}
 
-	fmt.Println()
-	printSetupSection("Tunnel")
-	fmt.Println("Checking Cloudflare named tunnel configuration...")
-	if err := bootstrapNamedTunnelDuringSetup(); err == nil {
-		fmt.Println("Named tunnel configuration ready.")
+	if err := upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken); err != nil {
+		return err
 	}
 
 	fmt.Println()
@@ -1013,24 +928,15 @@ func ensureChatBrokerEnvDefaults() error {
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
-
-	changed := false
-	if strings.TrimSpace(vals["GIMBLE_CHAT_PUBLIC_BASE"]) == "" {
-		vals["GIMBLE_CHAT_PUBLIC_BASE"] = defaultPublicChatBaseURL
-		changed = true
+	if strings.TrimSpace(vals["GIMBLE_CLOUD_API_BASE"]) == "" {
+		vals["GIMBLE_CLOUD_API_BASE"] = defaultCloudAPIBase
+		return saveKeyValueEnv(path, vals)
 	}
-	if strings.TrimSpace(vals["GIMBLE_CHAT_BROKER_ENDPOINT"]) == "" {
-		vals["GIMBLE_CHAT_BROKER_ENDPOINT"] = strings.TrimRight(defaultPublicChatBaseURL, "/") + "/api/register"
-		changed = true
-	}
-
-	if !changed {
-		return nil
-	}
-	return saveKeyValueEnv(path, vals)
+	return nil
 }
 
-func upsertChatEnv(openAIKey, groqKey string) error {
+
+func upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken string) error {
 	path, err := chatEnvPath()
 	if err != nil {
 		return err
@@ -1050,6 +956,12 @@ func upsertChatEnv(openAIKey, groqKey string) error {
 		if strings.TrimSpace(vals["GROQ_MODEL"]) == "" {
 			vals["GROQ_MODEL"] = "openai/gpt-oss-120b"
 		}
+	}
+	if strings.TrimSpace(cloudBase) != "" {
+		vals["GIMBLE_CLOUD_API_BASE"] = strings.TrimSpace(cloudBase)
+	}
+	if strings.TrimSpace(cloudToken) != "" {
+		vals["GIMBLE_CLOUD_API_TOKEN"] = strings.TrimSpace(cloudToken)
 	}
 	if err := saveKeyValueEnv(path, vals); err != nil {
 		return err
@@ -1601,8 +1513,8 @@ func helpText() string {
   gimble profile <command>   Manage Gimble profiles
 
 Inside a Gimble session, use:
-  gim chat                   Start ChatGPT-style local chat UI server
-  gim disconnect             Stop Gimble chat/tunnel, stay in current Gimble session
+  gim chat                   Start Gimble Cloud session + log uploader
+  gim disconnect             Stop Gimble cloud uploader, stay in current Gimble session
   gim exit                   Exit the active Gimble session
 
 Profile Commands:

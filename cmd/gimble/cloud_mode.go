@@ -25,6 +25,8 @@ type cloudSessionCreateResponse struct {
 	IngestEndpoint string `json:"ingest_endpoint"`
 }
 
+const defaultCloudAPIBase = "https://chat.gimble.dev"
+
 func shouldUseCloudMode() bool {
 	return strings.TrimSpace(cloudAPIBase()) != ""
 }
@@ -40,7 +42,7 @@ func cloudAPIBase() string {
 			}
 		}
 	}
-	return ""
+	return defaultCloudAPIBase
 }
 
 func cloudAPIToken() string {
@@ -54,7 +56,7 @@ func cloudAPIToken() string {
 			}
 		}
 	}
-	return ""
+	return defaultCloudAPIBase
 }
 
 func resolveSessionLogPath() (string, error) {
@@ -143,6 +145,9 @@ func runCloudChat() error {
 		return fmt.Errorf("cloud mode requested but GIMBLE_CLOUD_API_BASE is empty")
 	}
 	token := cloudAPIToken()
+	if strings.TrimSpace(token) == "" {
+		return fmt.Errorf("GIMBLE_CLOUD_API_TOKEN is required for cloud mode. Set it in chat.env or env vars")
+	}
 	userID := normalizedLocalUsername()
 	username := userID
 	if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
