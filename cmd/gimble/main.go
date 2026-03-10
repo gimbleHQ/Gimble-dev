@@ -134,13 +134,20 @@ func runSessionCommand(args []string) error {
 			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 		}
 		return runExitChatCommand()
+	case "keys":
+		if len(args) > 1 {
+			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
+		}
+		return runKeysWizard()
+	case "show":
+		return runShowCommand(args[1:])
 	case "exit":
 		if len(args) > 1 {
 			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 		}
 		return runExitSessionCommand()
 	default:
-		return fmt.Errorf("unknown session command %q", args[0])
+		return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 	}
 }
 
@@ -1563,6 +1570,8 @@ func helpText() string {
 Inside a Gimble session, use:
   gim chat                   Start Gimble Cloud session + log uploader
   gim disconnect             Stop Gimble cloud uploader, stay in current Gimble session
+  gim keys                   Update OpenAI/Groq API keys
+  gim show profile           Show active profile details
   gim exit                   Exit the active Gimble session
 
 Profile Commands:
