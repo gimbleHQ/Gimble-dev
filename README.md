@@ -156,6 +156,8 @@ On each `v*` tag push, a GitHub Actions workflow updates `Formula/gimble.rb` to 
 ```bash
 brew uninstall --zap --force gimble || true
 brew untap saketspradhan/gimble || true
+sudo rm -f /opt/homebrew/bin/gimble
+sudo rm -rf /opt/homebrew/share/gimble
 rm -rf "$HOME/Library/Application Support/gimble" "$HOME/.config/gimble" "$HOME/.cache/gimble" "$HOME/.local/share/gimble" "$HOME/.gimble"
 ```
 
