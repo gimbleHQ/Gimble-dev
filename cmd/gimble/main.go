@@ -107,6 +107,7 @@ func postCloudKeys(apiBase, token, userID, username string, providers map[string
 	if strings.TrimSpace(token) != "" {
 		req.Header.Set("X-Gimble-Token", token)
 	}
+	req.Header.Set("X-Gimble-Device", cloudDeviceID())
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return err
