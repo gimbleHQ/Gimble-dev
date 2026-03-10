@@ -11,12 +11,15 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/gimble-dev/gimble/internal/profile"
 )
 
 type cloudSessionCreateRequest struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	Source   string `json:"source"`
+	UserID        string            `json:"user_id"`
+	Username      string            `json:"username"`
+	Source        string            `json:"source"`
+	SessionConfig map[string]string `json:"session_config"`
 }
 
 type cloudSessionCreateResponse struct {
@@ -98,9 +101,66 @@ func findCloudUploaderScript() (string, error) {
 	return "", fmt.Errorf("could not locate python cloud uploader script")
 }
 
-func createCloudSession(apiBase, token, userID, username string) (*cloudSessionCreateResponse, error) {
+func buildSessionConfig() map[string]string {
+	cfg := map[string]string{}
+	profileCfg, err := profile.Load()
+	if err != nil {
+		return cfg
+	}
+	name, p, ok := profileCfg.Active()
+	if !ok {
+		return cfg
+	}
+	if strings.TrimSpace(name) != "" {
+		cfg["profile"] = name
+	}
+	if strings.TrimSpace(p.Name) != "" {
+		cfg["name"] = p.Name
+	}
+	if strings.TrimSpace(p.Email) != "" {
+		cfg["email"] = p.Email
+	}
+	if strings.TrimSpace(p.GitHub) != "" {
+		cfg["github"] = "@" + strings.TrimPrefix(p.GitHub, "@")
+	}
+	if len(p.WorkspaceRoots) > 0 {
+		cfg["roots"] = strings.Join(p.WorkspaceRoots, ", ")
+	}
+	rosBits := []string{}
+	if strings.TrimSpace(p.ROSType) != "" {
+		rosBits = append(rosBits, p.ROSType)
+	}
+	if strings.TrimSpace(p.ROSDistro) != "" {
+		rosBits = append(rosBits, p.ROSDistro)
+	}
+	if strings.TrimSpace(p.ROSWorkspace) != "" {
+		rosBits = append(rosBits, p.ROSWorkspace)
+	}
+	if len(rosBits) > 0 {
+		cfg["ros"] = strings.Join(rosBits, " | ")
+	}
+	obsBits := []string{}
+	if strings.TrimSpace(p.ObsGrafanaURL) != "" {
+		obsBits = append(obsBits, "Grafana: "+p.ObsGrafanaURL)
+	}
+	if strings.TrimSpace(p.ObsSentryURL) != "" {
+		obsBits = append(obsBits, "Sentry: "+p.ObsSentryURL)
+	}
+	if len(obsBits) > 0 {
+		cfg["obs"] = strings.Join(obsBits, " | ")
+	}
+	if strings.TrimSpace(p.SystemPromptProfile) != "" {
+		cfg["prompt"] = p.SystemPromptProfile
+	}
+	if strings.TrimSpace(p.NotificationPreference) != "" {
+		cfg["notify"] = p.NotificationPreference
+	}
+	return cfg
+}
+
+func createCloudSession(apiBase, token, userID, username string, sessionConfig map[string]string) (*cloudSessionCreateResponse, error) {
 	endpoint := strings.TrimRight(apiBase, "/") + "/v1/sessions"
-	payload := cloudSessionCreateRequest{UserID: userID, Username: username, Source: "gimble-cli"}
+	payload := cloudSessionCreateRequest{UserID: userID, Username: username, Source: "gimble-cli", SessionConfig: sessionConfig}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -154,7 +214,8 @@ func runCloudChat() error {
 		username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
 	}
 
-	sess, err := createCloudSession(apiBase, token, userID, username)
+	sessionConfig := buildSessionConfig()
+	sess, err := createCloudSession(apiBase, token, userID, username, sessionConfig)
 	if err != nil {
 		return err
 	}
