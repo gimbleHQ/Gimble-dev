@@ -672,6 +672,25 @@ func runSetupWizard() error {
 	}
 	handle = profile.NormalizeGitHub(handle)
 
+	fmt.Println()
+	printSetupSection("Experimental Settings (Optional)")
+	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	systemPromptChoice, err := promptChoiceMultiline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, true)
+	if err != nil {
+		return err
+	}
+	systemPromptProfile := ""
+	if systemPromptChoice >= 1 && systemPromptChoice <= 3 {
+		systemPromptProfile = []string{"debug-heavy", "concise", "incident-response"}[systemPromptChoice-1]
+	}
+
 	cfg, err := profile.Load()
 	if err != nil {
 		return err
@@ -693,25 +712,6 @@ func runSetupWizard() error {
 	cfg.ActiveProfile = "default"
 	if err := profile.Save(cfg); err != nil {
 		return err
-	}
-
-	fmt.Println()
-	printSetupSection("Experimental Settings (Optional)")
-	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	systemPromptChoice, err := promptChoiceMultiline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, true)
-	if err != nil {
-		return err
-	}
-	systemPromptProfile := ""
-	if systemPromptChoice >= 1 && systemPromptChoice <= 3 {
-		systemPromptProfile = []string{"debug-heavy", "concise", "incident-response"}[systemPromptChoice-1]
 	}
 
 	fmt.Println()
