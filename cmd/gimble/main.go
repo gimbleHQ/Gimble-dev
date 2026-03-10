@@ -78,6 +78,8 @@ func run(args []string) error {
 		return runKeysWizard()
 	case "profile":
 		return runProfile(args[1:])
+	case "show":
+		return runShowCommand(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", args[0], helpText())
 	}
@@ -1535,6 +1537,7 @@ func helpText() string {
   gimble setup               Run first-time setup wizard
   gimble keys                Update OpenAI/Groq API keys
   gimble profile <command>   Manage Gimble profiles
+  gimble show profile         Show profile details
 
 Inside a Gimble session, use:
   gim chat                   Start Gimble Cloud session + log uploader
