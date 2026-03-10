@@ -731,21 +731,16 @@ func runSetupWizard() error {
 		return err
 	}
 
-	googleChoice, err := promptOptional(reader, "Google sign-in for extra security? (y/N)")
-	if err != nil {
-		return err
-	}
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(googleChoice)), "y") {
-		apiBase := cloudAPIBase()
-		if apiBase != "" {
-			userID := normalizedLocalUsername()
-			username := userID
-			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
-				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
-			}
-			if err := googleDeviceFlow(apiBase, cloudAPIToken(), userID, username); err != nil {
-				return err
-			}
+	// Google sign-in is required when enabled on the server
+	apiBase := cloudAPIBase()
+	if apiBase != "" {
+		userID := normalizedLocalUsername()
+		username := userID
+		if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
+			username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
+		}
+		if err := googleDeviceFlow(apiBase, cloudAPIToken(), userID, username); err != nil {
+			return err
 		}
 	}
 
