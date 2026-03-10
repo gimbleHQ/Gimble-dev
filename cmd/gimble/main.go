@@ -74,6 +74,8 @@ func run(args []string) error {
 		return runSession()
 	case "setup":
 		return runSetupWizard()
+	case "keys":
+		return runKeysWizard()
 	case "profile":
 		return runProfile(args[1:])
 	default:
@@ -141,7 +143,6 @@ func runPythonChat(args []string) error {
 	}
 	return runCloudChat()
 }
-
 
 func isPIDAlive(pid int) bool {
 	if pid <= 0 {
@@ -935,7 +936,6 @@ func ensureChatBrokerEnvDefaults() error {
 	return nil
 }
 
-
 func upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken string) error {
 	path, err := chatEnvPath()
 	if err != nil {
@@ -1317,7 +1317,7 @@ func runSession() error {
 	} else {
 		printSessionIntro("", profile.Profile{})
 		fmt.Printf("Entering Gimble session on %s/%s. Type 'gim exit' to leave.\n", runtime.GOOS, runtime.GOARCH)
-		fmt.Println("Tip: initialize a profile with: gimble profile init --name \"Your Name\" --email you@example.com --github yourhandle")
+		fmt.Println("Tip: update API keys anytime with: gimble keys")
 	}
 
 	shellName := filepath.Base(shell)
@@ -1510,6 +1510,7 @@ func helpText() string {
   gimble session             Start Gimble shell session
   gimble --version           Print version
   gimble setup               Run first-time setup wizard
+  gimble keys                Update OpenAI/Groq API keys
   gimble profile <command>   Manage Gimble profiles
 
 Inside a Gimble session, use:
