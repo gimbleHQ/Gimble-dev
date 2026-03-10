@@ -85,6 +85,36 @@ func run(args []string) error {
 	}
 }
 
+func postCloudKeys(apiBase, token, userID, username string, providers map[string]string) error {
+	if apiBase == "" {
+		return fmt.Errorf("GIMBLE_CLOUD_API_BASE is empty")
+	}
+	endpoint := strings.TrimRight(apiBase, "/") + "/v1/keys"
+	payload := map[string]any{
+		"user_id":   userID,
+		"username":  username,
+		"providers": providers,
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(token) != "" {
+		req.Header.Set("X-Gimble-Token", token)
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("cloud keys update failed: %s", resp.Status)
+	}
+	return nil
+}
+
 func runSessionCommand(args []string) error {
 	if os.Getenv("GIMBLE_SESSION") != "1" {
 		return fmt.Errorf("session commands are only available inside a Gimble session")
@@ -780,6 +810,26 @@ func runKeysWizard() error {
 	}
 	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
 		return err
+	}
+	providers := map[string]string{}
+	if strings.TrimSpace(openAIKey) != "" {
+		providers["openai"] = strings.TrimSpace(openAIKey)
+	}
+	if strings.TrimSpace(groqKey) != "" {
+		providers["groq"] = strings.TrimSpace(groqKey)
+	}
+	if len(providers) > 0 {
+		apiBase := cloudAPIBase()
+		if apiBase != "" {
+			userID := normalizedLocalUsername()
+			username := userID
+			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
+				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
+			}
+			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
+				return err
+			}
+		}
 	}
 	fmt.Println("API keys updated.")
 	return nil
