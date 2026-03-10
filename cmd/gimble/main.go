@@ -696,6 +696,25 @@ func runSetupWizard() error {
 	}
 
 	fmt.Println()
+	printSetupSection("Experimental Settings (Optional)")
+	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
+	if err != nil {
+		return err
+	}
+	systemPromptChoice, err := promptChoiceMultiline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, true)
+	if err != nil {
+		return err
+	}
+	systemPromptProfile := ""
+	if systemPromptChoice >= 1 && systemPromptChoice <= 3 {
+		systemPromptProfile = []string{"debug-heavy", "concise", "incident-response"}[systemPromptChoice-1]
+	}
+
+	fmt.Println()
 	printSetupSection("Model Providers (Optional)")
 	fmt.Println("- You can get a OpenAI API key from https://platform.openai.com/api-keys, and add it here")
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
