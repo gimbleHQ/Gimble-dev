@@ -513,12 +513,6 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println("Gimble helps you debug deployment failures, inspect runtime behavior,")
 	fmt.Println("and trace issues across code, infrastructure, and robots in the field.")
 	fmt.Println()
-	fmt.Println(styleText("Capabilities", "1;33"))
-	fmt.Println("  - Runtime log analysis")
-	fmt.Println("  - ROS graph inspection")
-	fmt.Println("  - Deployment history tracing")
-	fmt.Println("  - Fleet anomaly detection")
-	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat          Start Gimble Cloud session + log uploader")
 	fmt.Println("  gim disconnect    Stop cloud uploader, keep Gimble session running")
@@ -621,19 +615,6 @@ func printSetupSection(title string) {
 	fmt.Println(styleText(title, "1;33"))
 }
 
-func parseCSVList(v string) []string {
-	parts := strings.Split(v, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		item := strings.TrimSpace(part)
-		if item == "" {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
 func runSetupWizard() error {
 	if !isInteractiveTerminal() {
 		return fmt.Errorf("setup requires an interactive terminal")
@@ -682,49 +663,6 @@ func runSetupWizard() error {
 	}
 	handle = profile.NormalizeGitHub(handle)
 
-	fmt.Println()
-	printSetupSection("Experimental Settings (Optional)")
-	workspaceRootsRaw, err := promptOptional(reader, "Workspace roots (comma-separated, Enter to skip)")
-	if err != nil {
-		return err
-	}
-	rosProfileChoice, err := promptChoiceMultiline(reader, "ROS profile", []string{"ROS1 / noetic", "ROS2 / humble", "ROS2 / jazzy", "ROS2 / rolling"}, true)
-	if err != nil {
-		return err
-	}
-	rosType := ""
-	rosDistro := ""
-	switch rosProfileChoice {
-	case 1:
-		rosType, rosDistro = "ros1", "noetic"
-	case 2:
-		rosType, rosDistro = "ros2", "humble"
-	case 3:
-		rosType, rosDistro = "ros2", "jazzy"
-	case 4:
-		rosType, rosDistro = "ros2", "rolling"
-	}
-	rosWorkspace, err := promptOptional(reader, "ROS workspace path (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	systemPromptChoice, err := promptChoiceMultiline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, true)
-	if err != nil {
-		return err
-	}
-	systemPromptProfile := ""
-	if systemPromptChoice >= 1 && systemPromptChoice <= 3 {
-		systemPromptProfile = []string{"debug-heavy", "concise", "incident-response"}[systemPromptChoice-1]
-	}
-
 	cfg, err := profile.Load()
 	if err != nil {
 		return err
@@ -734,13 +672,13 @@ func runSetupWizard() error {
 		Email:                  strings.TrimSpace(email),
 		GitHub:                 handle,
 		Provider:               profile.NormalizeProvider(provider),
-		WorkspaceRoots:         parseCSVList(workspaceRootsRaw),
-		ROSType:                strings.ToLower(strings.TrimSpace(rosType)),
-		ROSDistro:              strings.TrimSpace(rosDistro),
-		ROSWorkspace:           strings.TrimSpace(rosWorkspace),
-		ObsGrafanaURL:          strings.TrimSpace(grafanaURL),
-		ObsSentryURL:           strings.TrimSpace(sentryURL),
-		SystemPromptProfile:    strings.TrimSpace(systemPromptProfile),
+		WorkspaceRoots:         nil,
+		ROSType:                "",
+		ROSDistro:              "",
+		ROSWorkspace:           "",
+		ObsGrafanaURL:          "",
+		ObsSentryURL:           "",
+		SystemPromptProfile:    "",
 		NotificationPreference: "",
 	})
 	cfg.ActiveProfile = "default"
@@ -750,33 +688,18 @@ func runSetupWizard() error {
 
 	fmt.Println()
 	printSetupSection("Model Providers (Optional)")
-	fmt.Println("OpenAI key: https://platform.openai.com/api-keys")
+	fmt.Println("- You can get a OpenAI API key from https://platform.openai.com/api-keys, and add it here")
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
 		return err
 	}
-	fmt.Println("Groq key: https://console.groq.com/keys")
+	fmt.Println("- You can get a Groq API key from https://console.groq.com/keys, and add it here")
 	groqKey, err := promptOptional(reader, "Groq API key (press Enter to skip)")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println()
-	printSetupSection("Cloud Backend")
-	fmt.Println("Gimble Cloud API base (default https://chat.gimble.dev)")
-	cloudBase, err := promptOptional(reader, "GIMBLE_CLOUD_API_BASE (press Enter for default)")
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(cloudBase) == "" {
-		cloudBase = defaultCloudAPIBase
-	}
-	cloudToken, err := promptOptional(reader, "GIMBLE_CLOUD_API_TOKEN (required for cloud mode)")
-	if err != nil {
-		return err
-	}
-
-	if err := upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken); err != nil {
+	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
 		return err
 	}
 	providers := map[string]string{}
