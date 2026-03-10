@@ -975,6 +975,12 @@ func ensureChatBrokerEnvDefaults() error {
 			changed = true
 		}
 	}
+	if strings.TrimSpace(vals["GIMBLE_DEVICE_ID"]) == "" {
+		if tok, err := generateCloudToken(); err == nil {
+			vals["GIMBLE_DEVICE_ID"] = tok
+			changed = true
+		}
+	}
 	if changed {
 		return saveKeyValueEnv(path, vals)
 	}

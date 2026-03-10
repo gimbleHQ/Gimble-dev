@@ -18,15 +18,17 @@ def _event_id(session_id: str, seq: int, text: str) -> str:
     return f"evt_{h}"
 
 
-def _post(url: str, token: str, payload: dict[str, Any], timeout: float = 4.0) -> None:
+def _post(url: str, token: str, device_id: str, payload: dict[str, Any], timeout: float = 4.0) -> None:
     headers = {"Content-Type": "application/json"}
     if token:
         headers["X-Gimble-Token"] = token
+    if device_id:
+        headers["X-Gimble-Device"] = device_id
     r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=timeout)
     r.raise_for_status()
 
 
-def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: str, user_id: str, source: str = "terminal") -> None:
+def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: str, user_id: str, device_id: str = "", source: str = "terminal") -> None:
     p = Path(log_path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.touch(exist_ok=True)
@@ -64,7 +66,7 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
                 "metadata": {},
             }
             try:
-                _post(ingest_url, token, payload)
+                _post(ingest_url, token, device_id, payload)
             except Exception:
                 # Best-effort uploader: drop transient failures and continue.
                 time.sleep(0.8)
@@ -75,6 +77,7 @@ def main() -> int:
     ap.add_argument("--log-path", required=True)
     ap.add_argument("--ingest-url", required=True)
     ap.add_argument("--token", default="")
+    ap.add_argument("--device-id", default="")
     ap.add_argument("--session-id", required=True)
     ap.add_argument("--user-id", required=True)
     ap.add_argument("--source", default="terminal")
@@ -86,6 +89,7 @@ def main() -> int:
         token=args.token,
         session_id=args.session_id,
         user_id=args.user_id,
+        device_id=args.device_id,
         source=args.source,
     )
     return 0

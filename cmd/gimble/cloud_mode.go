@@ -61,7 +61,21 @@ func cloudAPIToken() string {
 			}
 		}
 	}
-	return defaultCloudAPIBase
+	return ""
+}
+
+func cloudDeviceID() string {
+	if v := strings.TrimSpace(os.Getenv("GIMBLE_DEVICE_ID")); v != "" {
+		return v
+	}
+	if path, err := chatEnvPath(); err == nil {
+		if vals, err := loadKeyValueEnv(path); err == nil {
+			if v := strings.TrimSpace(vals["GIMBLE_DEVICE_ID"]); v != "" {
+				return v
+			}
+		}
+	}
+	return "default"
 }
 
 func resolveSessionLogPath() (string, error) {
@@ -208,9 +222,10 @@ func createCloudSession(apiBase, token, userID, username string, sessionConfig m
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
+	if strings.TrimSpace(token) != "" {
 		req.Header.Set("X-Gimble-Token", token)
 	}
+	req.Header.Set("X-Gimble-Device", cloudDeviceID())
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return nil, err
