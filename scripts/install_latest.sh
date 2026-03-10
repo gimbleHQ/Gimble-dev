@@ -12,20 +12,29 @@ need_cmd() {
 }
 
 resolve_latest_tag() {
-  local tag
+  local release_tag latest_tag
   if need_cmd python3; then
-    tag="$(curl -fsSL "${API_BASE}/releases/latest" | python3 -c 'import sys, json; d=json.load(sys.stdin); print(d.get("tag_name", ""))' 2>/dev/null || true)"
+    release_tag="$(curl -fsSL "${API_BASE}/releases/latest" | python3 -c 'import sys, json; d=json.load(sys.stdin); print(d.get("tag_name", ""))' 2>/dev/null || true)"
   else
-    tag="$(curl -fsSL "${API_BASE}/releases/latest" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1 || true)"
+    release_tag="$(curl -fsSL "${API_BASE}/releases/latest" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1 || true)"
   fi
 
-  if [[ -z "${tag}" ]]; then
-    tag="$(curl -fsSL "${API_BASE}/tags" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1 || true)"
+  latest_tag="$(curl -fsSL "${API_BASE}/tags" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1 || true)"
+
+  if [[ -n "${latest_tag}" && "${latest_tag}" != "${release_tag}" ]]; then
+    printf "%s" "${latest_tag}"
+    return
   fi
 
-  [[ -n "${tag}" ]] || err "Could not resolve latest release tag for ${REPO}"
-  printf "%s" "${tag}"
+  if [[ -n "${release_tag}" ]]; then
+    printf "%s" "${release_tag}"
+    return
+  fi
+
+  [[ -n "${latest_tag}" ]] || err "Could not resolve latest release tag for ${REPO}"
+  printf "%s" "${latest_tag}"
 }
+
 
 install_go_if_missing() {
   if need_cmd go; then
@@ -101,7 +110,7 @@ main() {
   need_cmd curl || err "curl is required"
   need_cmd tar || err "tar is required"
 
-  local tag version tarball url tmpdir srcdir
+  local tag version tarball url srcdir
   tmpdir=""
 
   tag="$(resolve_latest_tag)"
@@ -112,7 +121,7 @@ main() {
   install_go_if_missing
 
   tmpdir="$(mktemp -d)"
-  trap '[ -n "${tmpdir}" ] && rm -rf "${tmpdir}"' EXIT
+  trap 'tmpdir_safe="${tmpdir:-}"; [ -n "${tmpdir_safe}" ] && rm -rf "${tmpdir_safe}"' EXIT
 
   tarball="${tmpdir}/gimble.tar.gz"
   curl -fsSL "${url}" -o "${tarball}"
