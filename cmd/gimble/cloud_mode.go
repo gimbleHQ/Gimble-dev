@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -158,6 +160,45 @@ func buildSessionConfig() map[string]string {
 	return cfg
 }
 
+func sendIngestHeartbeat(ingestURL, token, sessionID, userID string) error {
+	if ingestURL == "" {
+		return nil
+	}
+	ts := time.Now().UnixMilli()
+	seed := fmt.Sprintf("%s:%s:%d", sessionID, userID, ts)
+	h := sha1.Sum([]byte(seed))
+	eventID := hex.EncodeToString(h[:])[:20]
+	payload := map[string]any{
+		"event_id":   eventID,
+		"session_id": sessionID,
+		"user_id":    userID,
+		"ts_unix_ms": ts,
+		"sequence":   0,
+		"source":     "session_start",
+		"severity":   "info",
+		"text":       "session started",
+		"metadata":   map[string]any{"kind": "session_start"},
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodPost, ingestURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(token) != "" {
+		req.Header.Set("X-Gimble-Token", token)
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("ingest heartbeat failed: %s", resp.Status)
+	}
+	return nil
+}
+
 func createCloudSession(apiBase, token, userID, username string, sessionConfig map[string]string) (*cloudSessionCreateResponse, error) {
 	endpoint := strings.TrimRight(apiBase, "/") + "/v1/sessions"
 	payload := cloudSessionCreateRequest{UserID: userID, Username: username, Source: "gimble-cli", SessionConfig: sessionConfig}
@@ -218,6 +259,9 @@ func runCloudChat() error {
 	sess, err := createCloudSession(apiBase, token, userID, username, sessionConfig)
 	if err != nil {
 		return err
+	}
+	if err := sendIngestHeartbeat(sess.IngestEndpoint, token, sess.SessionID, userID); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to send ingest heartbeat: %v\n", err)
 	}
 
 	pythonExe, err := findPythonInterpreter()
