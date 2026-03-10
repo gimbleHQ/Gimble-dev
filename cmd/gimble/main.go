@@ -779,6 +779,26 @@ func runSetupWizard() error {
 	if err := upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken); err != nil {
 		return err
 	}
+	providers := map[string]string{}
+	if strings.TrimSpace(openAIKey) != "" {
+		providers["openai"] = strings.TrimSpace(openAIKey)
+	}
+	if strings.TrimSpace(groqKey) != "" {
+		providers["groq"] = strings.TrimSpace(groqKey)
+	}
+	if len(providers) > 0 {
+		apiBase := cloudAPIBase()
+		if apiBase != "" {
+			userID := normalizedLocalUsername()
+			username := userID
+			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
+				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
+			}
+			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
+				return err
+			}
+		}
+	}
 
 	fmt.Println()
 	printSetupSection("Runtime")
