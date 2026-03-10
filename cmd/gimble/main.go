@@ -114,7 +114,7 @@ func runExitChatCommand() error {
 	if err := stopPreviousChatTunnel(); err != nil {
 		return err
 	}
-	fmt.Println("Gimble Chat Agent stopped. You are still inside Gimble session.")
+	fmt.Println("Gimble Chat Agent stopped.")
 	return nil
 }
 
