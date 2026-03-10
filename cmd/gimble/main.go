@@ -111,6 +111,13 @@ func runSessionCommand(args []string) error {
 	}
 }
 
+func runShowCommand(args []string) error {
+	if len(args) == 0 || args[0] != "profile" {
+		return fmt.Errorf("usage: gimble show profile [profile]")
+	}
+	return profileShow(args[1:])
+}
+
 func runExitChatCommand() error {
 	if err := stopAndClearChatServer(); err != nil {
 		return err
