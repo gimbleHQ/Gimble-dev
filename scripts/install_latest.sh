@@ -54,6 +54,23 @@ install_go_if_missing() {
   err "Go is required to build Gimble. Install Go and rerun this script."
 }
 
+install_python_assets() {
+  local srcdir="$1"
+  local target_dir
+
+  if [[ "$(uname -s)" == "Darwin" && -d "/opt/homebrew/share" ]]; then
+    target_dir="/opt/homebrew/share/gimble"
+  elif [[ -d "/usr/local/share" ]]; then
+    target_dir="/usr/local/share/gimble"
+  else
+    target_dir="${HOME}/.local/share/gimble"
+  fi
+
+  mkdir -p "${target_dir}"
+  cp -R "${srcdir}/python" "${target_dir}/"
+  log "Installed python assets to ${target_dir}/python"
+}
+
 install_binary() {
   local src_bin="$1"
   local target
@@ -85,6 +102,7 @@ main() {
   need_cmd tar || err "tar is required"
 
   local tag version tarball url tmpdir srcdir
+  tmpdir=""
 
   tag="$(resolve_latest_tag)"
   version="${tag#v}"
@@ -94,7 +112,7 @@ main() {
   install_go_if_missing
 
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir}"' EXIT
+  trap '[ -n "${tmpdir}" ] && rm -rf "${tmpdir}"' EXIT
 
   tarball="${tmpdir}/gimble.tar.gz"
   curl -fsSL "${url}" -o "${tarball}"
@@ -106,6 +124,7 @@ main() {
   (cd "${srcdir}" && go build -ldflags "-X main.version=${version}" -o "${tmpdir}/gimble" ./cmd/gimble)
 
   install_binary "${tmpdir}/gimble"
+  install_python_assets "${srcdir}"
 
   log "Installed version: $(gimble --version || true)"
   log "Next: run 'gimble'"

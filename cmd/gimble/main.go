@@ -330,13 +330,13 @@ func ensurePythonChatRuntime(pythonExe string, scriptPath string) (string, error
 	}
 
 	if err := checkPythonRuntimeImports(pythonExe); err != nil {
-		return "", fmt.Errorf("python chat runtime is not ready: %w\nRun: %s", err, runtimeSetupHint(scriptPath))
+		return "", fmt.Errorf("python runtime is not ready: %w\nRun: %s", err, runtimeSetupHint(scriptPath))
 	}
 	return pythonExe, nil
 }
 
 func checkPythonRuntimeImports(pythonExe string) error {
-	cmd := exec.Command(pythonExe, "-c", "import flask, waitress")
+	cmd := exec.Command(pythonExe, "-c", "import requests")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(out))
@@ -532,7 +532,7 @@ func isInteractiveTerminal() bool {
 }
 
 func installPythonRuntimeDuringSetup() error {
-	scriptPath, err := findPythonChatServerScript()
+	scriptPath, err := findCloudUploaderScript()
 	if err != nil {
 		return err
 	}
