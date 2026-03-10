@@ -138,6 +138,13 @@ brew untap saketspradhan/gimble || true
 rm -rf "$HOME/Library/Application Support/gimble" "$HOME/.config/gimble" "$HOME/.cache/gimble" "$HOME/.local/share/gimble" "$HOME/.gimble"
 ```
 
+## Reinstall (Fresh)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
+gimble --version
+```
+
 ## Build From Source
 
 ```bash
