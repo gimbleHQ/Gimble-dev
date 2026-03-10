@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -955,11 +957,29 @@ func ensureChatBrokerEnvDefaults() error {
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
+	changed := false
 	if strings.TrimSpace(vals["GIMBLE_CLOUD_API_BASE"]) == "" {
 		vals["GIMBLE_CLOUD_API_BASE"] = defaultCloudAPIBase
+		changed = true
+	}
+	if strings.TrimSpace(vals["GIMBLE_CLOUD_API_TOKEN"]) == "" {
+		if tok, err := generateCloudToken(); err == nil {
+			vals["GIMBLE_CLOUD_API_TOKEN"] = tok
+			changed = true
+		}
+	}
+	if changed {
 		return saveKeyValueEnv(path, vals)
 	}
 	return nil
+}
+
+func generateCloudToken() (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken string) error {
