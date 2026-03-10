@@ -1,5 +1,5 @@
 APP := gimble
-VERSION ?= 0.1.17
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.2.0)
 LDFLAGS := -X main.version=$(VERSION)
 
 .PHONY: build build-linux build-macos package-deb clean
