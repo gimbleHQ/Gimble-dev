@@ -685,9 +685,9 @@ func runSetupWizard() error {
 		ROSType:                "",
 		ROSDistro:              "",
 		ROSWorkspace:           "",
-		ObsGrafanaURL:          "",
-		ObsSentryURL:           "",
-		SystemPromptProfile:    "",
+		ObsGrafanaURL:          strings.TrimSpace(grafanaURL),
+		ObsSentryURL:           strings.TrimSpace(sentryURL),
+		SystemPromptProfile:    strings.TrimSpace(systemPromptProfile),
 		NotificationPreference: "",
 	})
 	cfg.ActiveProfile = "default"
