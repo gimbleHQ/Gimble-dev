@@ -37,9 +37,6 @@ func shouldUseCloudMode() bool {
 }
 
 func cloudAPIBase() string {
-	if v := strings.TrimSpace(os.Getenv("GIMBLE_CLOUD_API_BASE")); v != "" {
-		return strings.TrimRight(v, "/")
-	}
 	if path, err := chatEnvPath(); err == nil {
 		if vals, err := loadKeyValueEnv(path); err == nil {
 			if v := strings.TrimSpace(vals["GIMBLE_CLOUD_API_BASE"]); v != "" {
@@ -47,13 +44,13 @@ func cloudAPIBase() string {
 			}
 		}
 	}
+	if v := strings.TrimSpace(os.Getenv("GIMBLE_CLOUD_API_BASE")); v != "" {
+		return strings.TrimRight(v, "/")
+	}
 	return defaultCloudAPIBase
 }
 
 func cloudAPIToken() string {
-	if v := strings.TrimSpace(os.Getenv("GIMBLE_CLOUD_API_TOKEN")); v != "" {
-		return v
-	}
 	if path, err := chatEnvPath(); err == nil {
 		if vals, err := loadKeyValueEnv(path); err == nil {
 			if v := strings.TrimSpace(vals["GIMBLE_CLOUD_API_TOKEN"]); v != "" {
@@ -61,19 +58,22 @@ func cloudAPIToken() string {
 			}
 		}
 	}
+	if v := strings.TrimSpace(os.Getenv("GIMBLE_CLOUD_API_TOKEN")); v != "" {
+		return v
+	}
 	return ""
 }
 
 func cloudDeviceID() string {
-	if v := strings.TrimSpace(os.Getenv("GIMBLE_DEVICE_ID")); v != "" {
-		return v
-	}
 	if path, err := chatEnvPath(); err == nil {
 		if vals, err := loadKeyValueEnv(path); err == nil {
 			if v := strings.TrimSpace(vals["GIMBLE_DEVICE_ID"]); v != "" {
 				return v
 			}
 		}
+	}
+	if v := strings.TrimSpace(os.Getenv("GIMBLE_DEVICE_ID")); v != "" {
+		return v
 	}
 	return "default"
 }
