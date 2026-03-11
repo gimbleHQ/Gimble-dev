@@ -25,6 +25,12 @@ def _post(url: str, token: str, device_id: str, payload: dict[str, Any], timeout
     if device_id:
         headers["X-Gimble-Device"] = device_id
     r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=timeout)
+    if r.status_code in {401, 410}:
+        body = r.text.strip()
+        if len(body) > 200:
+            body = body[:200] + "..."
+        print(f"uploader stopped ({r.status_code}): {body or 'unauthorized/expired'}", file=sys.stderr)
+        raise SystemExit(1)
     r.raise_for_status()
 
 
