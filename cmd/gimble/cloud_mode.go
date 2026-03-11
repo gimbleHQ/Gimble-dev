@@ -287,6 +287,7 @@ func sendIngestHeartbeat(ingestURL, token, sessionID, userID string) error {
 	if strings.TrimSpace(token) != "" {
 		req.Header.Set("X-Gimble-Token", token)
 	}
+	req.Header.Set("X-Gimble-Device", cloudDeviceID())
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return err
@@ -387,6 +388,7 @@ func runCloudChat() error {
 		"--log-path", logPath,
 		"--ingest-url", sess.IngestEndpoint,
 		"--token", token,
+		"--device-id", cloudDeviceID(),
 		"--session-id", sess.SessionID,
 		"--user-id", userID,
 	)

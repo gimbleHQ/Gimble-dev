@@ -321,6 +321,7 @@ func unregisterPublicSession(state tunnelState) error {
 			"-H", "Accept: application/json",
 			"--max-time", "6",
 			"-H", "X-Gimble-Token: "+token,
+			"-H", "X-Gimble-Device: "+cloudDeviceID(),
 			"--data", string(body),
 			"--write-out", "\n%{http_code}",
 			endpoint,
@@ -350,6 +351,7 @@ func unregisterPublicSession(state tunnelState) error {
 	if token != "" {
 		req.Header.Set("X-Gimble-Token", token)
 	}
+	req.Header.Set("X-Gimble-Device", cloudDeviceID())
 	resp, err := (&http.Client{Timeout: 6 * time.Second}).Do(req)
 	if err != nil {
 		return err
