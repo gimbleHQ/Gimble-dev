@@ -88,7 +88,7 @@ Other available models shown in the UI:
 
 - Groq: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `openai/gpt-oss-safeguard-20b`, `qwen/qwen3-32b`, `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`
 - OpenAI: `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-4.1-nano`
-- `GPT-Q 4K` is experimental and shown as a placeholder (non-selectable)
+- `GPT-Q 4K` is experimental (non-selectable)
 
 ## Cloud mode (private Gimble Cloud backend)
 
