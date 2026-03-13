@@ -409,6 +409,7 @@ func runCloudChat() error {
 	}
 	if err := saveTunnelState(tunnelState{
 		PID:           0,
+		UserID:        userID,
 		Username:      username,
 		SessionID:     sess.SessionID,
 		TunnelURL:     sess.PublicURL,

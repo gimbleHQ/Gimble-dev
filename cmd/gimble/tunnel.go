@@ -30,6 +30,7 @@ var tryCloudflareURLPattern = regexp.MustCompile(`https://[a-zA-Z0-9\-]+\.tryclo
 
 type tunnelState struct {
 	PID           int    `json:"pid"`
+	UserID        string `json:"user_id"`
 	Username      string `json:"username"`
 	SessionID     string `json:"session_id"`
 	TunnelURL     string `json:"tunnel_url"`
@@ -187,6 +188,7 @@ func startPublicChatTunnel(localPort int) (*publicTunnelInfo, error) {
 
 	if err := saveTunnelState(tunnelState{
 		PID:           info.PID,
+		UserID:        info.Username,
 		Username:      info.Username,
 		SessionID:     info.SessionID,
 		TunnelURL:     info.TunnelURL,
@@ -295,9 +297,12 @@ func registerPublicSession(endpoint string, info *publicTunnelInfo) error {
 }
 
 func unregisterPublicSession(state tunnelState) error {
-	username := strings.TrimSpace(strings.ToLower(state.Username))
+	userID := strings.TrimSpace(state.UserID)
+	if userID == "" {
+		userID = normalizedLocalUsername()
+	}
 	sessionID := strings.TrimSpace(strings.ToLower(state.SessionID))
-	if username == "" || sessionID == "" {
+	if userID == "" || sessionID == "" {
 		return nil
 	}
 
@@ -308,7 +313,7 @@ func unregisterPublicSession(state tunnelState) error {
 		baseURL := strings.TrimRight(chatBrokerSetting("GIMBLE_CHAT_PUBLIC_BASE", defaultPublicChatBaseURL), "/")
 		endpoint = chatBrokerSetting("GIMBLE_CHAT_BROKER_UNREGISTER_ENDPOINT", baseURL+"/api/unregister")
 	}
-	payload := map[string]any{"username": username, "session_id": sessionID}
+	payload := map[string]any{"user_id": userID, "session_id": sessionID}
 	body, _ := json.Marshal(payload)
 	token := cloudAPIToken()
 
