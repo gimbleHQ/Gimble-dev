@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"sort"
@@ -113,7 +114,14 @@ func NormalizeProvider(v string) string {
 
 func ValidateEmail(v string) error {
 	v = strings.TrimSpace(v)
-	if v == "" || !strings.Contains(v, "@") {
+	if v == "" {
+		return fmt.Errorf("invalid email: %q", v)
+	}
+	if _, err := mail.ParseAddress(v); err != nil {
+		return fmt.Errorf("invalid email: %q", v)
+	}
+	parts := strings.Split(v, "@")
+	if len(parts) != 2 || !strings.Contains(parts[1], ".") {
 		return fmt.Errorf("invalid email: %q", v)
 	}
 	return nil

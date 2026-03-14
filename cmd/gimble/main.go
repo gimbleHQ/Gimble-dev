@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -641,49 +642,142 @@ func runSetupWizard() error {
 
 	reader := bufio.NewReader(tty)
 
-	name, err := promptRequired(reader, "Full name")
+	name, err := promptRequired(reader, "User name")
 	if err != nil {
 		return err
 	}
 
-	email, err := promptRequired(reader, "Email address")
-	if err != nil {
-		return err
-	}
-	if err := profile.ValidateEmail(email); err != nil {
-		return err
+	var email string
+	for {
+		email, err = promptRequired(reader, "Email address")
+		if err != nil {
+			return err
+		}
+		if err := profile.ValidateEmail(email); err == nil {
+			break
+		}
+		fmt.Println("That doesn't look like a valid email. Please re-enter.")
 	}
 
-	providerChoice, err := promptChoiceInline(reader, "Code host", []string{"GitHub", "GitLab"}, 1, false)
-	if err != nil {
-		return err
-	}
 	provider := "github"
-	if providerChoice == 2 {
-		provider = "gitlab"
+	var handle string
+	for {
+		handle, err = promptRequired(reader, "GitHub username")
+		if err != nil {
+			return err
+		}
+		handle = profile.NormalizeGitHub(handle)
+
+		found, status, checkErr := verifyGitHubUsernameWithSpinner(handle)
+		if checkErr != nil {
+			fmt.Println("Profile Unverified.")
+			break
+		}
+		if found {
+			break
+		}
+		if status == http.StatusNotFound {
+			choice, err := promptChoiceInline(reader, "GitHub username not found. Re-enter?", []string{"Yes", "No"}, 2, false)
+			if err != nil {
+				return err
+			}
+			if choice == 1 {
+				continue
+			}
+			break
+		}
+		fmt.Printf("Profile Unverified (%d).\n", status)
+		break
 	}
 
-	handleLabel := "GitHub username"
-	if provider == "gitlab" {
-		handleLabel = "GitLab username"
-	}
-	handle, err := promptRequired(reader, handleLabel)
+	fmt.Println()
+	printSetupSection("Model Providers")
+	fmt.Println("- You can get a OpenAI API key from https://platform.openai.com/api-keys, and add it here")
+	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
 		return err
 	}
-	handle = profile.NormalizeGitHub(handle)
+	fmt.Println()
+	fmt.Println("- You can get a Groq API key from https://console.groq.com/keys, and add it here")
+	groqKey, err := promptOptional(reader, "Groq API key (press Enter to skip)")
+	if err != nil {
+		return err
+	}
+
+	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
+		return err
+	}
+
+	// Google sign-in is required when enabled on the server
+	apiBase := cloudAPIBase()
+	userID := normalizedLocalUsername()
+	username := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(handle, "@")))
+	if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
+		username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
+	}
+	if username == "" {
+		username = userID
+	}
+	if apiBase != "" {
+		if err := googleDeviceFlow(apiBase, cloudAPIToken(), userID, username); err != nil {
+			return err
+		}
+	}
+
+	providers := map[string]string{}
+	if strings.TrimSpace(openAIKey) != "" {
+		providers["openai"] = strings.TrimSpace(openAIKey)
+	}
+	if strings.TrimSpace(groqKey) != "" {
+		providers["groq"] = strings.TrimSpace(groqKey)
+	}
+	if len(providers) > 0 {
+		apiBase := cloudAPIBase()
+		if apiBase != "" {
+			userID := normalizedLocalUsername()
+			username := userID
+			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
+				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
+			}
+			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
+				return err
+			}
+		}
+	}
+
+	// One-time setup ping (privacy policy consented during Google sign-in)
+	{
+		apiBase := cloudAPIBase()
+		userID := normalizedLocalUsername()
+		deviceID := ""
+		if envPath := mustChatEnvPath(); envPath != "" {
+			if vals, err := loadKeyValueEnv(envPath); err == nil {
+				deviceID = strings.TrimSpace(vals["GIMBLE_DEVICE_ID"])
+			}
+		}
+		payload := map[string]any{
+			"user_id":        userID,
+			"user_name":      strings.TrimSpace(name),
+			"email":          strings.TrimSpace(email),
+			"github":         strings.TrimSpace(handle),
+			"cli_version":    version,
+			"os":             runtime.GOOS,
+			"arch":           runtime.GOARCH,
+			"install_method": installMethod(),
+			"timezone":       detectTimezone(),
+			"locale":         localLocale(),
+			"first_run_at":   time.Now().UTC().Format(time.RFC3339),
+			"device_id":      deviceID,
+			"user_agent":     setupUserAgent(),
+		}
+		sendSetupPing(apiBase, cloudAPIToken(), payload, deviceID)
+	}
 
 	fmt.Println()
 	printSetupSection("Experimental Settings (Optional)")
-	grafanaURL, err := promptOptional(reader, "Grafana URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	sentryURL, err := promptOptional(reader, "Sentry URL (Enter to skip)")
-	if err != nil {
-		return err
-	}
-	systemPromptChoice, err := promptChoiceMultiline(reader, "System prompt profile", []string{"debug-heavy", "concise", "incident-response"}, true)
+	grafanaURL := ""
+	sentryURL := ""
+	systemPromptChoice, err := promptChoiceMultiline(reader, "How do you want Gimble Agents to respond?", []string{"debug-heavy", "concise", "incident-response"}, true)
 	if err != nil {
 		return err
 	}
@@ -716,57 +810,6 @@ func runSetupWizard() error {
 	}
 
 	fmt.Println()
-	printSetupSection("Model Providers (Optional)")
-	fmt.Println("- You can get a OpenAI API key from https://platform.openai.com/api-keys, and add it here")
-	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
-	if err != nil {
-		return err
-	}
-	fmt.Println("- You can get a Groq API key from https://console.groq.com/keys, and add it here")
-	groqKey, err := promptOptional(reader, "Groq API key (press Enter to skip)")
-	if err != nil {
-		return err
-	}
-
-	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
-		return err
-	}
-
-	// Google sign-in is required when enabled on the server
-	apiBase := cloudAPIBase()
-	if apiBase != "" {
-		userID := normalizedLocalUsername()
-		username := userID
-		if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
-			username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
-		}
-		if err := googleDeviceFlow(apiBase, cloudAPIToken(), userID, username); err != nil {
-			return err
-		}
-	}
-
-	providers := map[string]string{}
-	if strings.TrimSpace(openAIKey) != "" {
-		providers["openai"] = strings.TrimSpace(openAIKey)
-	}
-	if strings.TrimSpace(groqKey) != "" {
-		providers["groq"] = strings.TrimSpace(groqKey)
-	}
-	if len(providers) > 0 {
-		apiBase := cloudAPIBase()
-		if apiBase != "" {
-			userID := normalizedLocalUsername()
-			username := userID
-			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
-				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
-			}
-			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
-				return err
-			}
-		}
-	}
-
-	fmt.Println()
 	printSetupSection("Runtime")
 	if err := installPythonRuntimeDuringSetup(); err != nil {
 		return err
@@ -777,7 +820,10 @@ func runSetupWizard() error {
 	printSetupSection("Setup Complete")
 	fmt.Printf("Active profile: default (%s, %s:@%s).\n", email, provider, handle)
 	fmt.Printf("Local secrets file: %s\n", chatPath)
-	fmt.Println("Keys are stored locally with user-only permissions and are never pushed by Gimble.")
+	if venvDir := pythonRuntimeDir(); venvDir != "" {
+		fmt.Printf("Python runtime location: %s\n", venvDir)
+	}
+	fmt.Println("Keys are stored locally with user-only permissions and, when cloud is configured, are sent to Gimble Cloud to enable chat.")
 	return nil
 }
 
@@ -785,7 +831,7 @@ func runKeysWizard() error {
 	if !isInteractiveTerminal() {
 		return fmt.Errorf("keys update requires an interactive terminal")
 	}
-	printSetupSection("Model Providers (Optional)")
+	printSetupSection("Model Providers")
 	reader := bufio.NewReader(os.Stdin)
 	openAIKey, err := promptOptional(reader, "OPENAI_API_KEY (press Enter to keep current)")
 	if err != nil {
@@ -820,6 +866,147 @@ func runKeysWizard() error {
 	}
 	fmt.Println("API keys updated.")
 	return nil
+}
+
+func verifyGitHubUsernameWithSpinner(handle string) (bool, int, error) {
+	type result struct {
+		found  bool
+		status int
+		err    error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		found, status, err := verifyGitHubUsername(handle)
+		ch <- result{found: found, status: status, err: err}
+	}()
+	spinner := []string{"|", "/", "-", "\\"}
+	i := 0
+	for {
+		select {
+		case res := <-ch:
+			statusText := "[UNVERIFIED]"
+			if res.err == nil {
+				if res.found {
+					statusText = "[OK]"
+				} else if res.status == http.StatusNotFound {
+					statusText = "[NOT FOUND]"
+				} else {
+					statusText = fmt.Sprintf("[UNVERIFIED %d]", res.status)
+				}
+			}
+			if res.found {
+				statusText = "Profile Verified."
+			} else if res.status == http.StatusNotFound {
+				statusText = "Profile Not Found."
+			} else {
+				statusText = fmt.Sprintf("Profile Unverified (%d).", res.status)
+			}
+			fmt.Printf("\r%-40s\n", statusText)
+			return res.found, res.status, res.err
+		default:
+			fmt.Printf("\rVerifying profile... %s", spinner[i%len(spinner)])
+			i++
+			time.Sleep(120 * time.Millisecond)
+		}
+	}
+}
+
+func verifyGitHubUsername(handle string) (bool, int, error) {
+	trimmed := strings.TrimSpace(handle)
+	if trimmed == "" {
+		return false, 0, fmt.Errorf("empty github username")
+	}
+	client := &http.Client{Timeout: 4 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.github.com/users/"+url.PathEscape(trimmed), nil)
+	if err != nil {
+		return false, 0, err
+	}
+	req.Header.Set("User-Agent", "Gimble-CLI")
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return true, resp.StatusCode, nil
+	}
+	return false, resp.StatusCode, nil
+}
+
+func pythonRuntimeDir() string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(home, "Library", "Application Support", "gimble", "pyenv")
+	}
+	return filepath.Join(home, ".config", "gimble", "pyenv")
+}
+
+func detectTimezone() string {
+	if tz := strings.TrimSpace(os.Getenv("TZ")); tz != "" {
+		return tz
+	}
+	if target, err := os.Readlink("/etc/localtime"); err == nil {
+		marker := "/zoneinfo/"
+		if idx := strings.Index(target, marker); idx >= 0 {
+			zone := target[idx+len(marker):]
+			if zone != "" {
+				return zone
+			}
+		}
+	}
+	if loc := time.Now().Location().String(); loc != "" && loc != "Local" {
+		return loc
+	}
+	return time.Now().Format("UTC-0700")
+}
+
+func installMethod() string {
+	exe, _ := os.Executable()
+	if strings.Contains(exe, "/opt/homebrew/") || strings.Contains(exe, "/usr/local/Homebrew/") {
+		return "brew"
+	}
+	if _, err := os.Stat("/etc/debian_version"); err == nil {
+		return "deb"
+	}
+	return "manual"
+}
+
+func localLocale() string {
+	for _, key := range []string{"LC_ALL", "LANG", "LC_CTYPE"} {
+		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func setupUserAgent() string {
+	return fmt.Sprintf("Gimble-CLI/%s (%s/%s)", version, runtime.GOOS, runtime.GOARCH)
+}
+
+func sendSetupPing(apiBase, token string, payload map[string]any, deviceID string) {
+	if apiBase == "" || token == "" {
+		return
+	}
+	buf, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	url := strings.TrimRight(apiBase, "/") + "/v1/telemetry/setup"
+	req, err := http.NewRequest("POST", url, bytes.NewReader(buf))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Gimble-Token", token)
+	if strings.TrimSpace(deviceID) != "" {
+		req.Header.Set("X-Gimble-Device", deviceID)
+	}
+	client := &http.Client{Timeout: 4 * time.Second}
+	_, _ = client.Do(req)
 }
 
 func promptRequired(reader *bufio.Reader, label string) (string, error) {
@@ -987,6 +1174,14 @@ func saveKeyValueEnv(path string, values map[string]string) error {
 		b.WriteString("\n")
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o600)
+}
+
+func mustChatEnvPath() string {
+	path, err := chatEnvPath()
+	if err != nil {
+		return ""
+	}
+	return path
 }
 
 func ensureChatBrokerEnvDefaults() error {
