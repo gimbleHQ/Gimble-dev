@@ -528,7 +528,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println("  gim chat          Start Gimble Cloud session + log uploader")
 	fmt.Println("  gim disconnect    Stop cloud uploader, keep Gimble session running")
 	fmt.Println("  gim show profile  Show active profile details")
-	fmt.Println("  gim keys          Update OpenAI/Groq API keys")
+	fmt.Println("  gim keys          Update OpenAI/Groq/Nebius API keys")
 	fmt.Println("  gim exit          Leave Gimble session")
 	fmt.Println()
 	fmt.Println(styleText("Try Asking", "1;33"))
@@ -703,8 +703,14 @@ func runSetupWizard() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println()
+	fmt.Println("- Nebius API key for openai/gpt-oss-120b or openai/gpt-oss-20b: https://console.nebius.com/")
+	nebiusKey, err := promptOptional(reader, "Nebius API key (press Enter to skip)")
+	if err != nil {
+		return err
+	}
 
-	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
+	if err := upsertChatEnv(openAIKey, groqKey, nebiusKey, "", ""); err != nil {
 		return err
 	}
 
@@ -730,6 +736,9 @@ func runSetupWizard() error {
 	}
 	if strings.TrimSpace(groqKey) != "" {
 		providers["groq"] = strings.TrimSpace(groqKey)
+	}
+	if strings.TrimSpace(nebiusKey) != "" {
+		providers["nebius"] = strings.TrimSpace(nebiusKey)
 	}
 	if len(providers) > 0 {
 		apiBase := cloudAPIBase()
@@ -841,7 +850,11 @@ func runKeysWizard() error {
 	if err != nil {
 		return err
 	}
-	if err := upsertChatEnv(openAIKey, groqKey, "", ""); err != nil {
+	nebiusKey, err := promptOptional(reader, "NEBIUS_API_KEY (press Enter to keep current)")
+	if err != nil {
+		return err
+	}
+	if err := upsertChatEnv(openAIKey, groqKey, nebiusKey, "", ""); err != nil {
 		return err
 	}
 	providers := map[string]string{}
@@ -850,6 +863,9 @@ func runKeysWizard() error {
 	}
 	if strings.TrimSpace(groqKey) != "" {
 		providers["groq"] = strings.TrimSpace(groqKey)
+	}
+	if strings.TrimSpace(nebiusKey) != "" {
+		providers["nebius"] = strings.TrimSpace(nebiusKey)
 	}
 	if len(providers) > 0 {
 		apiBase := cloudAPIBase()
@@ -1224,7 +1240,7 @@ func generateCloudToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken string) error {
+func upsertChatEnv(openAIKey, groqKey, nebiusKey, cloudBase, cloudToken string) error {
 	path, err := chatEnvPath()
 	if err != nil {
 		return err
@@ -1243,6 +1259,12 @@ func upsertChatEnv(openAIKey, groqKey, cloudBase, cloudToken string) error {
 		vals["GROQ_API_KEY"] = strings.TrimSpace(groqKey)
 		if strings.TrimSpace(vals["GROQ_MODEL"]) == "" {
 			vals["GROQ_MODEL"] = "openai/gpt-oss-120b"
+		}
+	}
+	if strings.TrimSpace(nebiusKey) != "" {
+		vals["NEBIUS_API_KEY"] = strings.TrimSpace(nebiusKey)
+		if strings.TrimSpace(vals["NEBIUS_MODEL"]) == "" {
+			vals["NEBIUS_MODEL"] = "openai/gpt-oss-120b"
 		}
 	}
 	if strings.TrimSpace(cloudBase) != "" {
@@ -1798,14 +1820,14 @@ func helpText() string {
   gimble session             Start Gimble shell session
   gimble --version           Print version
   gimble setup               Run first-time setup wizard
-  gimble keys                Update OpenAI/Groq API keys
+  gimble keys                Update OpenAI/Groq/Nebius API keys
   gimble profile <command>   Manage Gimble profiles
   gimble show profile         Show profile details
 
 Inside a Gimble session, use:
   gim chat                   Start Gimble Cloud session + log uploader
   gim disconnect             Stop Gimble cloud uploader, stay in current Gimble session
-  gim keys                   Update OpenAI/Groq API keys
+  gim keys                   Update OpenAI/Groq/Nebius API keys
   gim show profile           Show active profile details
   gim exit                   Exit the active Gimble session
 
