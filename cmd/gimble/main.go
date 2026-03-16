@@ -89,7 +89,7 @@ func run(args []string) error {
 	}
 }
 
-func postCloudKeys(apiBase, token, userID, username string, providers map[string]string) error {
+func postCloudKeys(apiBase, token, userID, username string, providers map[string]string, replace bool) error {
 	if apiBase == "" {
 		return fmt.Errorf("GIMBLE_CLOUD_API_BASE is empty")
 	}
@@ -98,6 +98,7 @@ func postCloudKeys(apiBase, token, userID, username string, providers map[string
 		"user_id":   userID,
 		"username":  username,
 		"providers": providers,
+		"replace":   replace,
 	}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
@@ -758,7 +759,7 @@ func runSetupWizard() error {
 			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
 				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
 			}
-			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
+			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers, true); err != nil {
 				return err
 			}
 		}
@@ -885,7 +886,7 @@ func runKeysWizard() error {
 			if v := strings.TrimSpace(os.Getenv("GIMBLE_USER_GITHUB")); v != "" {
 				username = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
 			}
-			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers); err != nil {
+			if err := postCloudKeys(apiBase, cloudAPIToken(), userID, username, providers, false); err != nil {
 				return err
 			}
 		}
