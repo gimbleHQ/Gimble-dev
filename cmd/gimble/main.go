@@ -692,22 +692,32 @@ func runSetupWizard() error {
 
 	fmt.Println()
 	printSetupSection("Model Providers")
-	fmt.Println("- You can get a OpenAI API key from https://platform.openai.com/api-keys, and add it here")
+	fmt.Println("Get an OpenAI API key at https://platform.openai.com/api-keys")
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println("- You can get a Groq API key from https://console.groq.com/keys, and add it here")
-	groqKey, err := promptOptional(reader, "Groq API key (press Enter to skip)")
-	if err != nil {
-		return err
+	openAIKey = strings.TrimSpace(openAIKey)
+
+	groqKey := ""
+	nebiusKey := ""
+	if openAIKey == "" {
+		fmt.Println()
+		fmt.Println("Get a Groq API key at https://console.groq.com/keys")
+		groqKey, err = promptOptional(reader, "Groq API key (press Enter to skip)")
+		if err != nil {
+			return err
+		}
+		groqKey = strings.TrimSpace(groqKey)
 	}
-	fmt.Println()
-	fmt.Println("- Nebius API key for openai/gpt-oss-120b or openai/gpt-oss-20b: https://console.nebius.com/")
-	nebiusKey, err := promptOptional(reader, "Nebius API key (press Enter to skip)")
-	if err != nil {
-		return err
+	if openAIKey == "" && groqKey == "" {
+		fmt.Println()
+		fmt.Println("Get a Nebius API key at https://console.nebius.com/")
+		nebiusKey, err = promptOptional(reader, "Nebius API key (press Enter to skip)")
+		if err != nil {
+			return err
+		}
+		nebiusKey = strings.TrimSpace(nebiusKey)
 	}
 
 	if err := upsertChatEnv(openAIKey, groqKey, nebiusKey, "", ""); err != nil {
@@ -731,14 +741,14 @@ func runSetupWizard() error {
 	}
 
 	providers := map[string]string{}
-	if strings.TrimSpace(openAIKey) != "" {
-		providers["openai"] = strings.TrimSpace(openAIKey)
+	if openAIKey != "" {
+		providers["openai"] = openAIKey
 	}
-	if strings.TrimSpace(groqKey) != "" {
-		providers["groq"] = strings.TrimSpace(groqKey)
+	if groqKey != "" {
+		providers["groq"] = groqKey
 	}
-	if strings.TrimSpace(nebiusKey) != "" {
-		providers["nebius"] = strings.TrimSpace(nebiusKey)
+	if nebiusKey != "" {
+		providers["nebius"] = nebiusKey
 	}
 	if len(providers) > 0 {
 		apiBase := cloudAPIBase()
