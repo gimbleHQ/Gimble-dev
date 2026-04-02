@@ -58,15 +58,14 @@ Outside a Gimble session:
 - `gimble` or `gimble session` — start Gimble shell session
 - `gimble setup` — run first-time setup wizard
 - `gimble keys` — update OpenAI/Groq API keys (syncs to cloud for your user)
-- `gimble show profile` — show profile details
+- `gimble profile` — show active profile details
 - `gimble profile <command>` — manage profiles
 
 Inside a Gimble session:
 
 - `gim chat` — start Gimble Cloud session + uploader
-- `gim disconnect` — stop cloud uploader (stay in session)
 - `gim keys` — update API keys
-- `gim show profile` — show active profile
+- `gim profile` — show active profile
 - `gim exit` — stop uploader (fail-safe) and exit session
 
 Profile helper commands:

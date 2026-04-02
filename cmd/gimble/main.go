@@ -82,8 +82,6 @@ func run(args []string) error {
 		return runKeysWizard()
 	case "profile":
 		return runProfile(args[1:])
-	case "show":
-		return runShowCommand(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", args[0], helpText())
 	}
@@ -132,18 +130,13 @@ func runSessionCommand(args []string) error {
 	switch args[0] {
 	case "chat":
 		return runPythonChat(args[1:])
-	case "disconnect":
-		if len(args) > 1 {
-			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
-		}
-		return runExitChatCommand()
 	case "keys":
 		if len(args) > 1 {
 			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 		}
 		return runKeysWizard()
-	case "show":
-		return runShowCommand(args[1:])
+	case "profile":
+		return runProfile(args[1:])
 	case "exit":
 		if len(args) > 1 {
 			return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
@@ -152,13 +145,6 @@ func runSessionCommand(args []string) error {
 	default:
 		return fmt.Errorf("unknown session command %q", strings.Join(args, " "))
 	}
-}
-
-func runShowCommand(args []string) error {
-	if len(args) == 0 || args[0] != "profile" {
-		return fmt.Errorf("usage: gimble show profile [profile]")
-	}
-	return profileShow(args[1:])
 }
 
 func runExitChatCommand() error {
@@ -527,8 +513,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat          Start Gimble Cloud session + log uploader")
-	fmt.Println("  gim disconnect    Stop cloud uploader, keep Gimble session running")
-	fmt.Println("  gim show profile  Show active profile details")
+	fmt.Println("  gim profile       Show active profile details")
 	fmt.Println("  gim keys          Update OpenAI/Groq/Nebius API keys")
 	fmt.Println("  gim exit          Leave Gimble session")
 	fmt.Println()
@@ -1357,7 +1342,7 @@ func profileAccountLabel(p profile.Profile) string {
 
 func runProfile(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("missing profile subcommand\n\n%s", profileHelpText())
+		return profileShow(nil)
 	}
 
 	switch args[0] {
@@ -1768,14 +1753,128 @@ SCRIPT_BIN="$4"
 PY_BIN="$5"
 SCRIPT_FLAG="$6"
 SANITIZER="$7"
+export GIMBLE_RAW="$RAW"
 
 "$PY_BIN" -u "$SANITIZER" "$RAW" "$CLEAN" &
 SAN_PID=$!
 
-if [ "$(uname -s)" = "Darwin" ]; then
-  "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" "$SHELL_BIN" -i
+HOOK_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "$HOOK_DIR"
+}
+trap cleanup EXIT INT TERM
+
+SHELL_NAME="$(basename "$SHELL_BIN")"
+SHELL_ARGS=""
+
+if [ "$SHELL_NAME" = "bash" ]; then
+  HOOK_FILE="$HOOK_DIR/gimble.bashrc"
+  cat > "$HOOK_FILE" <<'BRC'
+if [ -f "$HOME/.bashrc" ]; then
+  . "$HOME/.bashrc"
+fi
+__gimble_cmd_start() {
+  local cmd="$1"
+  if [ -z "$cmd" ]; then
+    return
+  fi
+  case "$cmd" in
+    __gimble_*|history*|PROMPT_COMMAND* ) return ;;
+  esac
+  local ts
+  ts=$(date +%s)
+  cmd="${cmd//$'\n'/ }"
+  local cwd="$PWD"
+  cwd="${cwd//\\/\\\\}"
+  cwd="${cwd// /\\ }"
+  cmd="${cmd//\\/\\\\}"
+  cmd="${cmd// /\\ }"
+  if [ -n "${GIMBLE_RAW:-}" ] && [ -w "$GIMBLE_RAW" ]; then
+    printf '[gimble.cmd.start] ts=%s cwd=%s cmd=%s\n' "$ts" "$cwd" "$cmd" >> "$GIMBLE_RAW"
+  fi
+  GIMBLE_LAST_CMD="$cmd"
+}
+__gimble_cmd_end() {
+  local exit_status=$?
+  local ts
+  ts=$(date +%s)
+  local cmd="${GIMBLE_LAST_CMD:-}"
+  if [ -z "$cmd" ]; then
+    cmd=$(history 1 | sed 's/^ *[0-9]* *//')
+  fi
+  cmd="${cmd//$'\n'/ }"
+  local cwd="$PWD"
+  cwd="${cwd//\\/\\\\}"
+  cwd="${cwd// /\\ }"
+  cmd="${cmd//\\/\\\\}"
+  cmd="${cmd// /\\ }"
+  if [ -n "${GIMBLE_RAW:-}" ] && [ -w "$GIMBLE_RAW" ]; then
+    printf '[gimble.cmd.end] ts=%s status=%s cwd=%s cmd=%s\n' "$ts" "$exit_status" "$cwd" "$cmd" >> "$GIMBLE_RAW"
+  fi
+}
+trap '__gimble_cmd_start "$BASH_COMMAND"' DEBUG
+PROMPT_COMMAND="__gimble_cmd_end${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+BRC
+  SHELL_ARGS="--rcfile $HOOK_FILE"
+elif [ "$SHELL_NAME" = "zsh" ]; then
+  HOOK_FILE="$HOOK_DIR/.zshrc"
+  cat > "$HOOK_FILE" <<'ZRC'
+if [ -f "$HOME/.zshrc" ]; then
+  source "$HOME/.zshrc"
+fi
+autoload -Uz add-zsh-hook 2>/dev/null || true
+gimble_preexec() {
+  local cmd="$1"
+  if [ -z "$cmd" ]; then
+    return
+  fi
+  local ts
+  ts=$(date +%s)
+  cmd="${cmd//$'\n'/ }"
+  local cwd="$PWD"
+  cwd="${cwd//\\/\\\\}"
+  cwd="${cwd// /\\ }"
+  cmd="${cmd//\\/\\\\}"
+  cmd="${cmd// /\\ }"
+  if [ -n "${GIMBLE_RAW:-}" ] && [ -w "$GIMBLE_RAW" ]; then
+    print -r -- "[gimble.cmd.start] ts=$ts cwd=$cwd cmd=$cmd" >> "$GIMBLE_RAW"
+  fi
+  GIMBLE_LAST_CMD="$cmd"
+}
+gimble_precmd() {
+  local exit_status=$?
+  local ts
+  ts=$(date +%s)
+  local cmd="${GIMBLE_LAST_CMD:-}"
+  cmd="${cmd//$'\n'/ }"
+  local cwd="$PWD"
+  cwd="${cwd//\\/\\\\}"
+  cwd="${cwd// /\\ }"
+  cmd="${cmd//\\/\\\\}"
+  cmd="${cmd// /\\ }"
+  if [ -n "${GIMBLE_RAW:-}" ] && [ -w "$GIMBLE_RAW" ]; then
+    print -r -- "[gimble.cmd.end] ts=$ts status=$exit_status cwd=$cwd cmd=$cmd" >> "$GIMBLE_RAW"
+  fi
+}
+if type add-zsh-hook >/dev/null 2>&1; then
+  add-zsh-hook preexec gimble_preexec
+  add-zsh-hook precmd gimble_precmd
 else
-  "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" -c "$SHELL_BIN -i"
+  preexec() { gimble_preexec "$@"; }
+  precmd() { gimble_precmd; }
+fi
+ZRC
+  export ZDOTDIR="$HOOK_DIR"
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  if [ -n "$SHELL_ARGS" ]; then
+    "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" "$SHELL_BIN" $SHELL_ARGS -i
+  else
+    "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" "$SHELL_BIN" -i
+  fi
+else
+  "$SCRIPT_BIN" -q "$SCRIPT_FLAG" "$RAW" -c "$SHELL_BIN $SHELL_ARGS -i"
 fi
 STATUS=$?
 sleep 0.3
@@ -1833,13 +1932,12 @@ func helpText() string {
   gimble setup               Run first-time setup wizard
   gimble keys                Update OpenAI/Groq/Nebius API keys
   gimble profile <command>   Manage Gimble profiles
-  gimble show profile         Show profile details
+  gimble profile             Show active profile details
 
 Inside a Gimble session, use:
   gim chat                   Start Gimble Cloud session + log uploader
-  gim disconnect             Stop Gimble cloud uploader, stay in current Gimble session
   gim keys                   Update OpenAI/Groq/Nebius API keys
-  gim show profile           Show active profile details
+  gim profile                Show active profile details
   gim exit                   Exit the active Gimble session
 
 Profile Commands:

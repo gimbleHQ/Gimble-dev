@@ -19,13 +19,13 @@ This file collects the most-used Gimble commands and short examples.
 
   gim chat
 
-- Stop the uploader (stay in the session):
-
-  gim disconnect
-
 - Exit the session and stop uploader:
 
   gim exit
+
+- Show active profile:
+
+  gim profile
 
 ## Key & profile management
 
@@ -35,6 +35,7 @@ This file collects the most-used Gimble commands and short examples.
 
 - Profile operations:
 
+  gimble profile
   gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]
   gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]
   gimble profile list

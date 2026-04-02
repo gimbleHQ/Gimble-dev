@@ -5,12 +5,44 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import requests
+
+
+CMD_MARKER_RE = re.compile(r"^\[gimble\.cmd\.(start|end)\]\s+(.*)$")
+
+
+def _unescape_shell(value: str) -> str:
+    if not value:
+        return value
+    return value.replace("\\\\", "\\").replace("\\ ", " ")
+
+
+def _parse_cmd_marker(text: str) -> dict[str, str] | None:
+    m = CMD_MARKER_RE.match(text)
+    if not m:
+        return None
+    kind = m.group(1)
+    rest = m.group(2)
+    cmd = ""
+    if " cmd=" in rest:
+        head, cmd = rest.split(" cmd=", 1)
+    else:
+        head = rest
+    meta: dict[str, str] = {"cmd_boundary": kind}
+    for token in head.split():
+        if "=" not in token:
+            continue
+        k, v = token.split("=", 1)
+        meta[k.strip()] = _unescape_shell(v.strip())
+    if cmd:
+        meta["cmd"] = _unescape_shell(cmd.strip())
+    return meta
 
 
 def _event_id(session_id: str, seq: int, text: str) -> str:
@@ -40,6 +72,7 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
     p.touch(exist_ok=True)
 
     seq = 0
+    adapter_hint = os.getenv("GIMBLE_LOG_HINT", "").strip().lower()
     with p.open("r", encoding="utf-8", errors="ignore") as f:
         f.seek(0, os.SEEK_END)
         while True:
@@ -53,6 +86,12 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
                 continue
 
             seq += 1
+            marker = _parse_cmd_marker(text)
+            if marker:
+                text = (
+                    f"command {marker.get('cmd_boundary','event')}: {marker.get('cmd','').strip()} "
+                    f"(cwd={marker.get('cwd','')}, status={marker.get('status','')})"
+                ).strip()
             sev = "info"
             lower = text.lower()
             if "error" in lower or "traceback" in lower:
@@ -71,6 +110,11 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
                 "text": text,
                 "metadata": {},
             }
+            if adapter_hint:
+                payload["metadata"]["adapter_hint"] = adapter_hint
+                payload["metadata"]["protocol"] = adapter_hint
+            if marker:
+                payload["metadata"].update(marker)
             try:
                 _post(ingest_url, token, device_id, payload)
             except Exception:
