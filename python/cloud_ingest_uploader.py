@@ -50,7 +50,10 @@ def _event_id(session_id: str, seq: int, text: str) -> str:
     return f"evt_{h}"
 
 
-def _post(url: str, token: str, device_id: str, payload: dict[str, Any], timeout: float = 4.0) -> None:
+_fallback_warned = False
+
+
+def _post(url: str, token: str, device_id: str, payload: dict[str, Any], timeout: float = 4.0) -> requests.Response:
     headers = {"Content-Type": "application/json"}
     if token:
         headers["X-Gimble-Token"] = token
@@ -64,6 +67,7 @@ def _post(url: str, token: str, device_id: str, payload: dict[str, Any], timeout
         print(f"uploader stopped ({r.status_code}): {body or 'unauthorized/expired'}", file=sys.stderr)
         raise SystemExit(1)
     r.raise_for_status()
+    return r
 
 
 def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: str, user_id: str, device_id: str = "", source: str = "terminal") -> None:
@@ -75,6 +79,7 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
     adapter_hint = os.getenv("GIMBLE_LOG_HINT", "").strip().lower()
     with p.open("r", encoding="utf-8", errors="ignore") as f:
         f.seek(0, os.SEEK_END)
+        fallback_used = False
         while True:
             line = f.readline()
             if not line:
@@ -117,6 +122,22 @@ def tail_and_upload(*, log_path: str, ingest_url: str, token: str, session_id: s
                 payload["metadata"].update(marker)
             try:
                 _post(ingest_url, token, device_id, payload)
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response else None
+                if status == 404 and (not fallback_used) and "/v1/events:ingest" in ingest_url:
+                    ingest_url = ingest_url.replace("/v1/events:ingest", "/v1/events/ingest")
+                    fallback_used = True
+                    global _fallback_warned
+                    if not _fallback_warned:
+                        print("warning: ingest endpoint returned 404, retrying with /v1/events/ingest", file=sys.stderr)
+                        _fallback_warned = True
+                    try:
+                        _post(ingest_url, token, device_id, payload)
+                    except Exception:
+                        pass
+                    continue
+                # Best-effort uploader: drop transient failures and continue.
+                time.sleep(0.8)
             except Exception:
                 # Best-effort uploader: drop transient failures and continue.
                 time.sleep(0.8)
