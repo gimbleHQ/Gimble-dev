@@ -5,50 +5,28 @@
 [![Latest Release](https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag)](https://github.com/Saketspradhan/Gimble-dev/releases/latest)
 
 Gimble is a free, open-source CLI for live debugging with evidence. Capture terminal and log context, share a live browser session, and get answers grounded in the exact events that happened.
+Gimble is a debugging assistant for physical systems that ingests live telemetry, ROS, terminals, and system state—helping engineers fix issues and ship faster without digging through thousands of log lines.
 
 - Capture live terminal and log context as you work
 - Open a live browser session you can share
 - Get answers with evidence, not guesses
 
-Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
-
-![Gimble CLI to Cloud flow (terminal + live UI)](docs/assets/gimble-story.png)
-
 ## Quickstart
 
-Install the latest release (macOS and Linux):
+Install (macOS + Linux):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
-```
-
-Verify:
-
-```bash
 gimble --version
-```
-
-First run (interactive setup wizard):
-
-```bash
 gimble
-```
-
-Start your first session:
-
-1. Start a Gimble session:
-
-```bash
-gimble
-```
-
-2. Inside the session, start cloud chat:
-
-```bash
 gim chat
 ```
 
-3. Open the printed session URL in your browser to view the live conversation.
+Open the session URL printed by `gim chat`.
+
+Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
+
+![Gimble CLI to Cloud flow (terminal + live UI)](docs/assets/gimble-story.png)
 
 ## How it works
 
