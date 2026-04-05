@@ -67,7 +67,6 @@ Profiles (team and identity settings):
 ## Docs
 
 - [Command reference](docs/commands.md)
-- [Examples](docs/examples.md)
 - [Environment and local config](docs/env.md)
 - [Troubleshooting](docs/troubleshooting.md)
 

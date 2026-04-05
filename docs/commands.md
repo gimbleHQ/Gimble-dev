@@ -1,59 +1,100 @@
-# Commands — Expanded reference
+# Command reference
 
-This file collects the most-used Gimble commands and short examples.
+Commands available from your system shell vs. **inside** an active Gimble session differ: use `gimble` (and `gimble …` subcommands) to start and configure; use `gim …` only after you have started a session.
 
-## Start / session
+## Quick lookup
 
-- Start a shell session:
+| When | Command | What it does |
+|------|---------|----------------|
+| Shell | `gimble` / `gimble session` | Start Gimble shell session |
+| Shell | `gimble --version` | Print CLI version |
+| Shell | `gimble setup` | First-time setup wizard |
+| Shell | `gimble keys` | Update OpenAI / Groq / Nebius API keys |
+| Shell | `gimble profile …` | Manage profiles (see [Profile commands](#profile-commands)) |
+| Session | `gim chat` | Start Gimble Cloud session + log uploader |
+| Session | `gim keys` | Update OpenAI / Groq / Nebius API keys |
+| Session | `gim profile` | Show active profile details |
+| Session | `gim exit` | Stop uploader and exit session |
 
-  gimble
-  gimble session
+---
 
-- Run first-time setup wizard:
+## Top-level (`gimble`)
 
-  gimble setup
+Run these from a normal terminal (not necessarily inside Gimble yet).
 
-## Chat / cloud
+```bash
+gimble                     # Start Gimble shell session
+gimble session             # Same as above
+gimble --version           # Print version
+gimble setup               # Run first-time setup wizard
+gimble keys                # Update OpenAI / Groq / Nebius API keys
+gimble profile <command>   # Manage Gimble profiles
+gimble profile             # Show active profile details
+```
 
-- Start cloud chat session with background uploader:
+**Help**
 
-  gim chat
+```bash
+gimble --help
+```
 
-- Exit the session and stop uploader:
+---
 
-  gim exit
+## Inside a session (`gim`)
 
-- Show active profile:
+After `gimble` or `gimble session`, use the `gim` prefix:
 
-  gim profile
+```bash
+gim chat                   # Start Gimble Cloud session + log uploader
+gim keys                   # Update OpenAI / Groq / Nebius API keys
+gim profile                # Show active profile details
+gim exit                   # Exit the active Gimble session
+```
 
-## Key & profile management
+---
 
-- Update API keys (OpenAI, Groq):
+## Profile commands
 
-  gimble keys
+Use `gimble profile …` from your normal shell. Inside a session, `gim profile` only **shows** the active profile; creating, switching, and deleting profiles uses `gimble profile` from outside (or from another terminal).
 
-- Profile operations:
+**Summary**
 
-  gimble profile
-  gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]
-  gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]
-  gimble profile list
-  gimble profile show [profile]
-  gimble profile use <profile>
-  gimble profile delete <profile>
+| Subcommand | What it does |
+|------------|----------------|
+| *(no subcommand)* | Show active profile details |
+| `init` | Create a profile (`--name`, `--email`, `--github`; optional `--provider` `github` or `gitlab`; optional `--profile`) |
+| `set` | Update a profile (`--profile` plus optional `--name`, `--email`, `--github`, `--provider`) |
+| `list` | List profiles |
+| `show` | Show a profile (`[profile]` defaults to active) |
+| `use` | Set active profile |
+| `delete` | Remove a profile |
 
-## Help & version
+**Exact forms** (match `gimble --help`):
 
-- Show help for top-level commands:
+```text
+gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]
+gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]
+gimble profile list
+gimble profile show [profile]
+gimble profile use <profile>
+gimble profile delete <profile>
+```
 
-  gimble --help
+**Examples** (replace placeholders):
 
-- Show version:
+```bash
+gimble profile init --name "Ada" --email "ada@example.com" --github "adal"
+gimble profile set --profile "Ada" --email "new@example.com"
+gimble profile list
+gimble profile show
+gimble profile use "team"
+gimble profile delete "old-profile"
+```
 
-  gimble --version
+---
 
+## Tips
 
-Tips
-- Use `--help` after any subcommand for context-specific flags (for example: `gimble profile --help`).
-- When scripting, check `gimble --version` before running automated flows to ensure compatibility.
+- Run `gimble --help` or `gimble <subcommand> --help` for flags and edge cases not listed here.
+- Before scripting against the CLI, pin behavior with `gimble --version` so automation matches the installed binary.
+- Start cloud chat and log upload with `gim chat` **after** you are in a session; exit cleanly with `gim exit`.
