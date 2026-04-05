@@ -58,6 +58,24 @@ install_go_if_missing() {
       sudo apt-get install -y golang-go
       return 0
     fi
+
+    if need_cmd dnf; then
+      log "Go not found. Installing Go with dnf..."
+      sudo dnf install -y golang
+      return 0
+    fi
+
+    if need_cmd yum; then
+      log "Go not found. Installing Go with yum..."
+      sudo yum install -y golang
+      return 0
+    fi
+
+    if need_cmd pacman; then
+      log "Go not found. Installing Go with pacman..."
+      sudo pacman -Sy --noconfirm go
+      return 0
+    fi
   fi
 
   err "Go is required to build Gimble. Install Go and rerun this script."
