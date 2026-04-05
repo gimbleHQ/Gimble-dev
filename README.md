@@ -4,27 +4,35 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-111111)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag)](https://github.com/Saketspradhan/Gimble-dev/releases/latest)
 
-Gimble is a free, open-source CLI for live debugging with evidence. Capture terminal and log context, share a live browser session, and get answers grounded in the exact events that happened.
-Gimble is a debugging assistant for physical systems that ingests live telemetry, ROS, terminals, and system state—helping engineers fix issues and ship faster without digging through thousands of log lines.
+Gimble is a free, open-source CLI for debugging physical systems. It captures terminal and log context, ingests live telemetry and system state—so engineers can get answers grounded in real events and fix issues faster without digging through thousands of log lines.
 
 - Capture live terminal and log context as you work
 - Open a live browser session you can share
-- Get answers with evidence, not guesses
+- Get answers with evidence, not hallucinations or guesswork
 
 ## Quickstart
 
-Install (macOS + Linux):
+Install (Linux + macOS):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
-gimble --version
-gimble
+```
+
+and complete the initial setup.
+
+After installation and the initial setup, you can initiate a session using 
+
+```bash
+gimble 
+```
+
+Once inside a local Gimble session, you can create a queryable browser chat interface through
+
+```bash
 gim chat
 ```
 
-Open the session URL printed by `gim chat`.
-
-Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
+Gimble CLI connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
 
 ![Gimble CLI to Cloud flow (terminal + live UI)](docs/assets/gimble-story.png)
 
@@ -32,12 +40,12 @@ Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that p
 
 ```mermaid
 flowchart LR
-  CLI["Gimble CLI on your machine"] -->|"sanitized session logs"| Cloud["Gimble Cloud (hosted)"]
+  CLI["Gimble CLI on local machine"] -->|"sanitized session logs"| Cloud["Gimble Cloud (hosted)"]
   Cloud -->|"live chat + evidence"| UI["Browser UI"]
 ```
 
 - The CLI captures session activity and uploads sanitized logs.
-- Gimble Cloud turns that context into a live, shareable browser session.
+- Gimble Cloud turns that context into a live, queryable and shareable browser session.
 - Every answer is grounded with evidence from your session history.
 
 ## Usage
@@ -45,13 +53,12 @@ flowchart LR
 Everyday commands:
 
 - `gimble` - start a Gimble session
-- `gimble setup` - run first-time setup wizard
+- `gimble setup` - run first-time setup wizard again
+
 - `gim chat` - start cloud chat and uploader (inside a session)
 - `gim exit` - stop uploader and exit session
-
-Bring your own model keys:
-
-- `gimble keys` - set OpenAI, Groq, or Nebius API keys
+- `gim keys` - set OpenAI, Groq, or Nebius API keys
+- `gim profile` - show logged in profile
 
 Profiles (team and identity settings):
 
@@ -66,7 +73,7 @@ Profiles (team and identity settings):
 
 ## Support
 
-If you hit an issue or have a feature request, please [open a GitHub issue](https://github.com/Saketspradhan/Gimble-dev/issues).
+If you hit an issue or have a feature request, please [open a GitHub issue](https://github.com/Saketspradhan/Gimble-dev/issues). You can also reach us at [gimble256@gmail.com](mailto:gimble256@gmail.com).
 
 ## License
 
