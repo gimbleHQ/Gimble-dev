@@ -12,7 +12,7 @@ Gimble is a free, open-source CLI for live debugging with evidence. Capture term
 
 Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
 
-![Gimble live chat UI with evidence](docs/assets/gimble-ui.png)
+![Gimble CLI to Cloud flow (terminal + live UI)](docs/assets/gimble-story.png)
 
 ## Quickstart
 
