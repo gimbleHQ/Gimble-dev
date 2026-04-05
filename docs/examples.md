@@ -1,4 +1,4 @@
-# Examples — short workflows
+# Examples - short workflows
 
 ## Install and verify
 
@@ -37,22 +37,5 @@ gimble profile list
 # switch to a profile
 gimble profile use default
 ```
-
-## Install via package manager
-
-- Homebrew (macOS):
-
-```bash
-brew tap saketspradhan/gimble https://github.com/Saketspradhan/Gimble-dev
-brew install gimble
-```
-
-- APT (Linux): follow the one-time keyring setup then:
-
-```bash
-sudo apt update
-sudo apt install gimble
-```
-
 
 These short examples cover the most common developer and user flows; see `commands.md` for more detail.

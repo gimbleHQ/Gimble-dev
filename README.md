@@ -1,163 +1,95 @@
-# Gimble.dev
+# Gimble CLI
 
-Gimble is a cross-platform command-line tool for robotics debugging and observability on macOS and Linux.
+[![MIT License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-111111)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag)](https://github.com/Saketspradhan/Gimble-dev/releases/latest)
 
-This README is reorganized for a concise quick start. For an expanded reference (commands, env, examples) and troubleshooting, see the `docs/` folder.
+Gimble is a free, open-source CLI for live debugging with evidence. Capture terminal and log context, share a live browser session, and get answers grounded in the exact events that happened.
 
-## Quick start
+- Capture live terminal and log context as you work
+- Open a live browser session you can share
+- Get answers with evidence, not guesses
 
-1) Install (recommended — installs latest release):
+Gimble CLI is open-source and connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
+
+![Gimble live chat UI with evidence](docs/assets/gimble-ui.png)
+
+## Quickstart
+
+Install the latest release (macOS and Linux):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
 ```
 
-2) Verify installation:
+Verify:
 
 ```bash
 gimble --version
 ```
 
-3) First run (initializes local config via interactive wizard):
+First run (interactive setup wizard):
 
 ```bash
 gimble
 ```
 
-Local config/secrets are stored under:
+Start your first session:
 
-- macOS: `~/Library/Application Support/gimble/`
-- Linux: `~/.config/gimble/`
-
-## Package manager installs
-
-- macOS (Homebrew):
+1. Start a Gimble session:
 
 ```bash
-brew tap saketspradhan/gimble https://github.com/Saketspradhan/Gimble-dev
-brew install gimble
+gimble
 ```
 
-- Linux (APT): one-time repository setup, then install:
+2. Inside the session, start cloud chat:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/gh-pages/gimble-archive-keyring.gpg \
-  | sudo tee /usr/share/keyrings/gimble-archive-keyring.gpg >/dev/null
-
-echo "deb [signed-by=/usr/share/keyrings/gimble-archive-keyring.gpg] https://saketspradhan.github.io/Gimble-dev stable main" \
-  | sudo tee /etc/apt/sources.list.d/gimble.list >/dev/null
-
-sudo apt update
-sudo apt install gimble
+gim chat
 ```
 
-## Common commands
+3. Open the printed session URL in your browser to view the live conversation.
 
-Outside a Gimble session:
+## How it works
 
-- `gimble` or `gimble session` — start Gimble shell session
-- `gimble setup` — run first-time setup wizard
-- `gimble keys` — update OpenAI/Groq API keys (syncs to cloud for your user)
-- `gimble profile` — show active profile details
-- `gimble profile <command>` — manage profiles
-
-Inside a Gimble session:
-
-- `gim chat` — start Gimble Cloud session + uploader
-- `gim keys` — update API keys
-- `gim profile` — show active profile
-- `gim exit` — stop uploader (fail-safe) and exit session
-
-Profile helper commands:
-
-- `gimble profile init --name <name> --email <email> --github <github> [--provider github|gitlab] [--profile <name>]`
-- `gimble profile set --profile <name> [--name <name>] [--email <email>] [--github <github>] [--provider github|gitlab]`
-- `gimble profile list`
-- `gimble profile show [profile]`
-- `gimble profile use <profile>`
-- `gimble profile delete <profile>`
-
-## Chat models (UI)
-
-Default provider/model:
-
-- Groq: `openai/gpt-oss-120b`
-
-Other available models shown in the UI:
-
-- Groq: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `openai/gpt-oss-safeguard-20b`, `qwen/qwen3-32b`, `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`
-- OpenAI: `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-4.1-nano`
-- `GPT-Q 4K` is experimental (non-selectable)
-
-## Cloud mode (private Gimble Cloud backend)
-
-Chat and context compilation run in the cloud. The CLI stores these values in a local `chat.env` file:
-
-In the cloud, `gim chat` will:
-
-- create a cloud session (`/v1/sessions`)
-- print a session URL like `https://chat.gimble.dev/<username>/<session_id>`
-- start a background uploader which sends sanitized session logs to `/v1/events:ingest`
-
-Private backend scaffold (local reference):
-
-- `/Users/<username>/Desktop/gimble-cloud`
-
-### What happens in the cloud (high level)
-
-Gimble Cloud (proprietary) handles ingestion, normalization, indexing and retrieval. High-level pipeline:
-
-- Ingest: sanitized session logs → `/v1/events:ingest`
-- Normalize + Store: Postgres (with Redis caching)
-- Indexing: pgvector (semantic) and Meilisearch (keyword)
-- Workers: produce summaries and anomaly signals
-- Context compiler: builds compact prompts from recent events, summaries and vector/keyword matches
-- LLM: Groq (`gpt-oss-120b`) answers using structured context
-
-This keeps the client lightweight while the cloud performs scalable ingestion and retrieval.
-
-## Development and releases
-
-Build from source:
-
-```bash
-make build
+```mermaid
+flowchart LR
+  CLI["Gimble CLI on your machine"] -->|"sanitized session logs"| Cloud["Gimble Cloud (hosted)"]
+  Cloud -->|"live chat + evidence"| UI["Browser UI"]
 ```
 
-Release artifacts:
+- The CLI captures session activity and uploads sanitized logs.
+- Gimble Cloud turns that context into a live, shareable browser session.
+- Every answer is grounded with evidence from your session history.
 
-```bash
-make build-linux
-make build-macos
-```
+## Usage
 
-Updating/Installing latest release (same as quick start install):
+Everyday commands:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
-```
+- `gimble` - start a Gimble session
+- `gimble setup` - run first-time setup wizard
+- `gim chat` - start cloud chat and uploader (inside a session)
+- `gim exit` - stop uploader and exit session
 
-Maintainer automation:
+Bring your own model keys:
 
-On each `v*` tag push, a GitHub Actions workflow updates `Formula/gimble.rb` to the new tag + tarball SHA256.
+- `gimble keys` - set OpenAI, Groq, or Nebius API keys
 
-- workflow: `.github/workflows/update-homebrew-formula.yml`
-- helper script: `scripts/update-homebrew-formula.sh`
+Profiles (team and identity settings):
 
-## Remove Gimble completely
+- Use `gimble profile ...` commands. See the docs for details.
 
-```bash
-brew uninstall --zap --force gimble || true
-brew untap saketspradhan/gimble || true
-sudo rm -f /opt/homebrew/bin/gimble
-sudo rm -rf /opt/homebrew/share/gimble
-rm -rf "$HOME/Library/Application Support/gimble" "$HOME/.config/gimble" "$HOME/.cache/gimble" "$HOME/.local/share/gimble" "$HOME/.gimble"
-```
+## Docs
 
-## Reinstall (fresh)
+- [Command reference](docs/commands.md)
+- [Examples](docs/examples.md)
+- [Environment and local config](docs/env.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-Follow the Quick start install and verify steps above.
+## Support
+
+If you hit an issue or have a feature request, please [open a GitHub issue](https://github.com/Saketspradhan/Gimble-dev/issues).
 
 ## License
 
-See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
