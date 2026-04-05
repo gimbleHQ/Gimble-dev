@@ -18,15 +18,15 @@ Install (Linux + macOS):
 curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
 ```
 
-and complete the initial setup.
+Then finish **first-time setup** (the installer or `gimble setup` will guide you).
 
-After installation and the initial setup, you can initiate a session using 
+**Start a session** (normal terminal):
 
 ```bash
-gimble 
+gimble
 ```
 
-Once inside a local Gimble session, you can create a queryable browser chat interface through
+**Cloud chat + log upload** (run inside that session):
 
 ```bash
 gim chat
@@ -40,39 +40,58 @@ Gimble CLI connects to a hosted Gimble Cloud companion that powers chat and evid
 
 ```mermaid
 flowchart LR
-  CLI["Gimble CLI on local machine"] -->|"sanitized session logs"| Cloud["Gimble Cloud (hosted)"]
-  Cloud -->|"live chat + evidence"| UI["Browser UI"]
+  CLI["Gimble CLI on local machine"] -->|" sanitized session logs "| Cloud["Gimble Cloud (hosted)"]
+  Cloud -->|" live chat + evidence "| UI["Browser UI"]
 ```
 
 - The CLI captures session activity and uploads sanitized logs.
 - Gimble Cloud turns that context into a live, queryable and shareable browser session.
 - Every answer is grounded with evidence from your session history.
 
+---
+
 ## Usage
 
-Everyday commands:
+Commands depend on **where** you run them: your normal shell (`gimble …`) vs **inside** an active Gimble session (`gim …`).
 
-- `gimble` - start a Gimble session
-- `gimble setup` - run first-time setup wizard again
+### Shell (`gimble`)
 
-- `gim chat` - start cloud chat and uploader (inside a session)
-- `gim exit` - stop uploader and exit session
-- `gim keys` - set OpenAI, Groq, or Nebius API keys
-- `gim profile` - show logged in profile
+| Command | What it does |
+|--------|----------------|
+| `gimble` / `gimble session` | Start a Gimble shell session |
+| `gimble --version` | Print the installed version |
+| `gimble setup` | Run the first-time setup wizard |
+| `gimble keys` | Set OpenAI, Groq, or Nebius API keys |
+| `gimble profile` | Show the active profile; use `gimble profile <subcommand>` to create, switch, or edit profiles |
 
-Profiles (team and identity settings):
+### Inside a session (`gim`)
 
-- Use `gimble profile ...` commands. See the docs for details.
+| Command | What it does |
+|--------|----------------|
+| `gim chat` | Start Gimble Cloud chat and the log uploader |
+| `gim keys` | Update API keys without leaving the session |
+| `gim profile` | Show the active profile |
+| `gim exit` | Stop the uploader and leave the session |
 
-## Docs
+Full syntax (especially profiles), flags, and examples: **[command reference](docs/commands.md)**. Use `gimble --help` for the exact text your build ships with.
 
-- [Command reference](docs/commands.md)
-- [Environment and local config](docs/env.md)
-- [Troubleshooting](docs/troubleshooting.md)
+---
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| **[Command reference](docs/commands.md)** | All commands, profile subcommands, examples |
+| **[Environment & local config](docs/env.md)** | Config paths, `chat.env`, proxies, logs |
+| **[Troubleshooting](docs/troubleshooting.md)** | PATH, permissions, Homebrew, APT, network |
+
+---
 
 ## Support
 
-If you hit an issue or have a feature request, please [open a GitHub issue](https://github.com/Saketspradhan/Gimble-dev/issues). You can also reach us at [gimble256@gmail.com](mailto:gimble256@gmail.com).
+**Issues & feature requests** — [GitHub Issues](https://github.com/Saketspradhan/Gimble-dev/issues).
+
+**Email** — [gimble256@gmail.com](mailto:gimble256@gmail.com).
 
 ## License
 
