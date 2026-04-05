@@ -581,6 +581,8 @@ def main() -> int:
     tui_min_ratio = _env_float("GIMBLE_TUI_MIN_ALNUM_RATIO", 0.20)
     tui_strip_box = _env_bool("GIMBLE_TUI_STRIP_BOX", True)
     tui_pseudo_ttl = _env_float("GIMBLE_TUI_PSEUDO_TTL_SECS", 4.0)
+    cmd_out_max_lines = _env_int("GIMBLE_CMD_OUT_MAX_LINES", 100)
+    cmd_out_max_bytes = _env_int("GIMBLE_CMD_OUT_MAX_BYTES", 20000)
     tui = TUIScreenBuffer(
         mode=tui_mode,
         interval=tui_interval,
@@ -589,6 +591,22 @@ def main() -> int:
         strip_box=tui_strip_box,
         pseudo_ttl=tui_pseudo_ttl,
     )
+
+    cmd_active = False
+    cmd_passthrough = False
+    cmd_buffer: list[str] = []
+    cmd_bytes = 0
+
+    def _flush_cmd_buffer() -> None:
+        nonlocal cmd_buffer, cmd_bytes
+        if not cmd_buffer:
+            return
+        ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for line in cmd_buffer:
+            dst.write(f"[{ts}] [cmd.out] {line}\n")
+        dst.flush()
+        cmd_buffer = []
+        cmd_bytes = 0
 
     with open(raw_path, "rb") as src, open(clean_path, "a", encoding="utf-8") as dst:
         src.seek(0)
@@ -610,6 +628,40 @@ def main() -> int:
                     line = norm.normalize(line)
                     if not line:
                         continue
+                    if CMD_MARKER_RE.match(line):
+                        if cmd_active and not cmd_passthrough:
+                            _flush_cmd_buffer()
+                        cmd_active = ".cmd.start" in line
+                        cmd_passthrough = False
+                        cmd_buffer = []
+                        cmd_bytes = 0
+                        ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        dst.write(f"[{ts}] {line}\n")
+                        dst.flush()
+                        continue
+
+                    if cmd_active:
+                        if looks_like_prompt_noise(line):
+                            if not cmd_passthrough:
+                                _flush_cmd_buffer()
+                            cmd_active = False
+                            cmd_passthrough = False
+                            cmd_buffer = []
+                            cmd_bytes = 0
+                            continue
+                        if not cmd_passthrough:
+                            cmd_buffer.append(line)
+                            cmd_bytes += len(line) + 1
+                            if len(cmd_buffer) > cmd_out_max_lines or cmd_bytes > cmd_out_max_bytes:
+                                ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                for buffered in cmd_buffer:
+                                    dst.write(f"[{ts}] {buffered}\n")
+                                dst.flush()
+                                cmd_buffer = []
+                                cmd_bytes = 0
+                                cmd_passthrough = True
+                            continue
+
                     if not line.startswith("[tui") and not _signal_line(line, tui_min_ratio) and looks_like_prompt_noise(line):
                         continue
                     ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
