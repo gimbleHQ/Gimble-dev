@@ -1,8 +1,19 @@
-# Gimble CLI
-
-[![MIT License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-111111)](LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag)](https://github.com/Saketspradhan/Gimble-dev/releases/latest)
+<p align="center">
+  <img src="docs/assets/gimble-logo.svg" width="160" alt="Gimble logo" />
+</p>
+<h1 align="center">Gimble</h1>
+<p align="center">Live debugging for physical systems. Capture terminal and telemetry, share a live browser session, and get evidence-grounded answers.</p>
+<p align="center">
+  <a href="https://gimble.dev">Website</a> ·
+  <a href="https://chat.gimble.dev">Live UI</a> ·
+  <a href="docs/">Docs</a> ·
+  <a href="https://github.com/Saketspradhan/Gimble-dev/issues">Issues</a>
+</p>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-111111" alt="Platform" />
+  <a href="https://github.com/Saketspradhan/Gimble-dev/releases/latest"><img src="https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag" alt="Latest Release" /></a>
+</p>
 
 Gimble is a free, open-source CLI for debugging physical systems. It captures terminal and log context, ingests live telemetry and system state—so engineers can get answers grounded in real events and fix issues faster without digging through thousands of log lines.
 
@@ -34,15 +45,19 @@ gim chat
 
 Gimble CLI connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
 
-![Gimble CLI to Cloud flow (terminal + live UI)](docs/assets/gimble-story.png)
+<p align="center">
+  <img src="docs/assets/gimble-hero.gif" width="900" alt="Gimble demo" />
+</p>
 
-## How it works
+<p align="center">
+  <img src="docs/assets/gimble-story.png" width="900" alt="Gimble CLI to Cloud flow (terminal + live UI)" />
+</p>
 
-```mermaid
-flowchart LR
-  CLI["Gimble CLI on local machine"] -->|" sanitized session logs "| Cloud["Gimble Cloud (hosted)"]
-  Cloud -->|" live chat + evidence "| UI["Browser UI"]
-```
+## Architecture
+
+<p align="center">
+  <img src="docs/assets/gimble-architecture.svg" width="900" alt="Gimble architecture diagram" />
+</p>
 
 - The CLI captures session activity and uploads sanitized logs.
 - Gimble Cloud turns that context into a live, queryable and shareable browser session.
@@ -84,6 +99,12 @@ Full syntax (especially profiles), flags, and examples: **[command reference](do
 | **[Command reference](docs/commands.md)** | All commands, profile subcommands, examples |
 | **[Environment & local config](docs/env.md)** | Config paths, `chat.env`, proxies, logs |
 | **[Troubleshooting](docs/troubleshooting.md)** | PATH, permissions, Homebrew, APT, network |
+
+---
+
+## Contributing
+
+We welcome contributions. Please read the [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before getting started.
 
 ---
 

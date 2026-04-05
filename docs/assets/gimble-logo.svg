@@ -1,0 +1,6 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="180" rx="24" fill="transparent"/>
+  <circle cx="86" cy="90" r="22" fill="#00D687"/>
+  <circle cx="86" cy="90" r="40" fill="rgba(0,214,135,0.14)"/>
+  <text x="140" y="112" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#111111">Gimble</text>
+</svg>
