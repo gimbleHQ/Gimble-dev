@@ -122,6 +122,20 @@ PY
   return 1
 }
 
+ensure_virtualenv_module() {
+  local py="${1:-python3}"
+  if run_quiet "${py}" -m virtualenv --version; then
+    return 0
+  fi
+  if run_quiet "${py}" -m pip --version; then
+    log "Installing virtualenv into ${py} environment..."
+    if run_quiet "${py}" -m pip install --upgrade virtualenv; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
 select_runtime_python() {
   local candidates=()
   local py
@@ -150,7 +164,7 @@ select_runtime_python() {
     if ! python_version_ge "${py}" 3 8; then
       continue
     fi
-    if python_virtualenv_ok "${py}" || python_virtualenv_ok_download "${py}"; then
+    if python_virtualenv_ok "${py}" || python_virtualenv_ok_download "${py}" || ensure_virtualenv_module "${py}"; then
       RUNTIME_PY="${py}"
       return 0
     fi
@@ -732,6 +746,9 @@ setup_python_runtime() {
     err_with_log "Failed to create Gimble runtime directory."
   fi
   local py="${RUNTIME_PY:-python3}"
+  if ! run_quiet "${py}" -m venv "${venv_dir}"; then
+    ensure_virtualenv_module "${py}" || true
+  fi
   if ! run_quiet "${py}" -m venv "${venv_dir}"; then
     if run_quiet "${py}" -m virtualenv --download "${venv_dir}" || run_quiet "${py}" -m virtualenv "${venv_dir}"; then
       true
