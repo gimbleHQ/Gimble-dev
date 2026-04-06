@@ -750,6 +750,7 @@ setup_python_runtime() {
 install_python_assets() {
   local srcdir="$1"
   local target_dir
+  local fallback_dir
 
   if [[ "$(uname -s)" == "Darwin" && -d "/opt/homebrew/share" ]]; then
     target_dir="/opt/homebrew/share/gimble"
@@ -760,22 +761,26 @@ install_python_assets() {
   fi
 
   if mkdir -p "${target_dir}" 2>/dev/null; then
-    if ! cp -R "${srcdir}/python" "${target_dir}/"; then
-      err "Failed to install python assets to ${target_dir}."
-    fi
-  else
-    if need_cmd sudo; then
-      if ! sudo mkdir -p "${target_dir}"; then
-        err "Failed to create ${target_dir}. Run with sudo or choose a writable path."
-      fi
-      if ! sudo cp -R "${srcdir}/python" "${target_dir}/"; then
-        err "Failed to install python assets to ${target_dir} with sudo."
-      fi
-    else
-      err "Permission denied creating ${target_dir}. Install with sudo or choose a writable path."
+    if cp -R "${srcdir}/python" "${target_dir}/" 2>/dev/null; then
+      log "Installed python assets to ${target_dir}/python"
+      return 0
     fi
   fi
-  log "Installed python assets to ${target_dir}/python"
+
+  if need_cmd sudo; then
+    if sudo mkdir -p "${target_dir}" && sudo cp -R "${srcdir}/python" "${target_dir}/"; then
+      log "Installed python assets to ${target_dir}/python"
+      return 0
+    fi
+  fi
+
+  fallback_dir="${HOME}/.local/share/gimble"
+  mkdir -p "${fallback_dir}"
+  if cp -R "${srcdir}/python" "${fallback_dir}/"; then
+    log "Installed python assets to ${fallback_dir}/python"
+    return 0
+  fi
+  err "Failed to install python assets to ${target_dir} or ${fallback_dir}."
 }
 
 install_binary() {
