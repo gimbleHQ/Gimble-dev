@@ -1,5 +1,5 @@
 <h1 align="center">Gimble CLI</h1>
-<p align="center">AI debugging for physical systems. Capture logs and telemetry, share a live browser session, and get evidence-grounded answers.</p>
+<p align="center">AI debugging for physical systems. Capture logs and telemetry, and get evidence-grounded answers.</p>
 <p align="center">
   <a href="https://gimble.dev">Website</a> ·
   <!-- <a href="https://chat.gimble.dev">Live UI</a> · -->
