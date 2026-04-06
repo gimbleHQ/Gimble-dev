@@ -1,6 +1,6 @@
 # Gimble Data Sharing and Privacy Policy
 
-Last updated: 2026-04-06
+Last updated: UTC 2026-04-06T21:42:09Z
 
 This Privacy Policy describes how Gimble.dev ("Gimble," "we," "our," or "us") may collect, process, transmit, store, and use information when you install, configure, or use Gimble. This project is experimental and actively being tested. By continuing setup, you acknowledge and accept the terms in this policy.
 
