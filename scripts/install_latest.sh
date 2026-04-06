@@ -241,7 +241,7 @@ sha256_file() {
 install_go_tarball() {
   ensure_sudo
 
-  local os arch tmp json_file info_file filename sha url actual used_version_endpoint
+  local os arch tmp json_file info_file filename sha url used_version_endpoint
   if ! read -r os arch < <(go_os_arch); then
     local raw_os raw_arch
     raw_os="$(uname -s 2>/dev/null | tr -d '\r\n')"
@@ -277,19 +277,11 @@ install_go_tarball() {
     version_minor="${version_minor%%.*}"
     if [[ -n "${version_minor}" && "${version_minor}" -ge 22 ]]; then
       filename="${version_line}.${os}-${arch}.tar.gz"
-      sha="$(curl -fsSL "https://go.dev/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
-      if [[ -z "${sha}" ]]; then
-        sha="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
-      fi
-      if [[ "${sha}" =~ ^[0-9a-fA-F]{64}$ ]]; then
-        used_version_endpoint="true"
-      else
-        sha=""
-      fi
+      used_version_endpoint="true"
     fi
   fi
 
-  if [[ -z "${filename}" || -z "${sha}" ]]; then
+  if [[ -z "${filename}" ]]; then
     if ! run_quiet curl -fsSL "https://go.dev/dl/?mode=json" -o "${json_file}"; then
       err_with_log "Failed to download Go release manifest."
     fi
@@ -361,7 +353,7 @@ PY
     used_version_endpoint="false"
   fi
 
-  if [[ -z "${filename}" || -z "${sha}" ]]; then
+  if [[ -z "${filename}" ]]; then
     err_with_log "Failed to resolve Go 1.22+ download for ${os}/${arch}."
   fi
 
@@ -370,10 +362,6 @@ PY
     err_with_log "Failed to download Go ${filename}."
   fi
 
-  actual="$(sha256_file "${tmp}/${filename}" || true)"
-  if [[ -z "${actual}" ]]; then
-    err "sha256sum or shasum is required to verify Go download."
-  fi
   # Checksum verification disabled per current install policy.
 
   if ! run_quiet "${SUDO_CMD[@]}" rm -rf /usr/local/go; then
