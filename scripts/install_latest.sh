@@ -332,12 +332,29 @@ if filename and sha:
 sys.exit(1)
 PY
   then
-    err_with_log "Failed to resolve Go 1.22+ download for ${os}/${arch}."
+    true
   fi
 
-  read -r filename sha <"${info_file}"
+  read -r filename sha <"${info_file}" 2>/dev/null || true
   if [[ -z "${filename}" || -z "${sha}" ]]; then
-    err_with_log "Go download metadata was incomplete."
+    local version_line version_minor
+    version_line="$(curl -fsSL "https://go.dev/VERSION?m=text" 2>>"${LOG_FILE}" || curl -fsSL "https://golang.org/VERSION?m=text" 2>>"${LOG_FILE}" || true)"
+    version_line="$(printf "%s" "${version_line}" | head -n1 | tr -d '\r\n')"
+    if [[ "${version_line}" =~ ^go1\. ]]; then
+      version_minor="${version_line#go1.}"
+      version_minor="${version_minor%%.*}"
+      if [[ -n "${version_minor}" && "${version_minor}" -ge 22 ]]; then
+        filename="${version_line}.${os}-${arch}.tar.gz"
+        sha="$(curl -fsSL "https://go.dev/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+        if [[ -z "${sha}" ]]; then
+          sha="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+        fi
+      fi
+    fi
+  fi
+
+  if [[ -z "${filename}" || -z "${sha}" ]]; then
+    err_with_log "Failed to resolve Go 1.22+ download for ${os}/${arch}."
   fi
 
   url="https://go.dev/dl/${filename}"
