@@ -105,12 +105,10 @@ We welcome contributions. Please read the [Contributing Guide](CONTRIBUTING.md) 
 
 We love support from the community and appreciate you taking the time to try Gimble — thank you. 
 
-This is a passion project born out of our frustration with unreliable systems, and we’re trying our best to keep it free and open-source for everyone. We currently cover the compute costs ourselves and rely on free-tier cloud resources, so heavy usage can occasionally trigger rate limits. If that happens, please reach out — we’d love to discuss and figure out a way to support your use case. 
+This is a passion project born out of our frustration with unreliable systems, and we’re trying our best to keep it free and open-source for everyone. We currently cover the compute costs ourselves and rely on free-tier cloud resources, so heavy usage can occasionally trigger rate limits. If that happens, please reach out to us [here](mailto:gimble256@gmail.com) — we’d love to discuss and figure out a way to support your use case. 
 
-- Regards, S & R.
-
-**Issues & feature requests** — [GitHub Issues](https://github.com/Saketspradhan/Gimble-dev/issues).
-**Email** — [gimble256@gmail.com](mailto:gimble256@gmail.com).
+Regards, S & R.
+Email: [gimble256@gmail.com](mailto:gimble256@gmail.com).
 
 ## License
 
