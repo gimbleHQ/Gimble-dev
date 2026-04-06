@@ -746,6 +746,10 @@ setup_python_runtime() {
     err_with_log "Failed to create Gimble runtime directory."
   fi
   local py="${RUNTIME_PY:-python3}"
+  # Clean up a broken or partial venv before creating a new one.
+  if [[ -d "${venv_dir}" && ! -x "${venv_dir}/bin/python3" && ! -x "${venv_dir}/bin/python" ]]; then
+    rm -rf "${venv_dir}" || true
+  fi
   if ! run_quiet "${py}" -m venv "${venv_dir}"; then
     ensure_virtualenv_module "${py}" || true
   fi
