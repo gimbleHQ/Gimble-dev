@@ -241,7 +241,7 @@ sha256_file() {
 install_go_tarball() {
   ensure_sudo
 
-  local os arch tmp json_file info_file filename sha url actual
+  local os arch tmp json_file info_file filename sha url actual used_version_endpoint
   if ! read -r os arch < <(go_os_arch); then
     local raw_os raw_arch
     raw_os="$(uname -s 2>/dev/null | tr -d '\r\n')"
@@ -269,6 +269,7 @@ install_go_tarball() {
 
   init_log
   local version_line version_minor
+  used_version_endpoint="false"
   version_line="$(curl -fsSL "https://go.dev/VERSION?m=text" 2>>"${LOG_FILE}" || curl -fsSL "https://golang.org/VERSION?m=text" 2>>"${LOG_FILE}" || true)"
   version_line="$(printf "%s" "${version_line}" | head -n1 | tr -d '\r\n')"
   if [[ "${version_line}" =~ ^go1\. ]]; then
@@ -279,6 +280,11 @@ install_go_tarball() {
       sha="$(curl -fsSL "https://go.dev/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
       if [[ -z "${sha}" ]]; then
         sha="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+      fi
+      if [[ "${sha}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        used_version_endpoint="true"
+      else
+        sha=""
       fi
     fi
   fi
@@ -352,6 +358,7 @@ PY
     fi
 
     read -r filename sha <"${info_file}" 2>/dev/null || true
+    used_version_endpoint="false"
   fi
 
   if [[ -z "${filename}" || -z "${sha}" ]]; then
@@ -368,7 +375,58 @@ PY
     err "sha256sum or shasum is required to verify Go download."
   fi
   if [[ "${actual}" != "${sha}" ]]; then
-    err_with_log "Go download checksum verification failed."
+    if [[ "${used_version_endpoint}" == "true" ]]; then
+      local sha_alt
+      sha_alt="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+      if [[ "${sha_alt}" =~ ^[0-9a-fA-F]{64}$ && "${actual}" == "${sha_alt}" ]]; then
+        sha="${sha_alt}"
+      else
+        if run_quiet curl -fsSL "https://go.dev/dl/?mode=json" -o "${json_file}"; then
+          local pybin=""
+          if need_cmd python3; then
+            pybin="python3"
+          elif need_cmd python; then
+            pybin="python"
+          fi
+          if [[ -n "${pybin}" ]]; then
+            if "${pybin}" - "${json_file}" "${os}" "${arch}" >"${info_file}" 2>>"${LOG_FILE}" <<'PY'
+import json
+import sys
+path, os_name, arch = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+for rel in data:
+    version = rel.get("version", "")
+    if not version.startswith("go1."):
+        continue
+    for fobj in rel.get("files", []):
+        if fobj.get("kind") != "archive":
+            continue
+        if fobj.get("os") == os_name and fobj.get("arch") == arch:
+            print(fobj.get("filename", ""), fobj.get("sha256", ""))
+            sys.exit(0)
+sys.exit(1)
+PY
+            then
+              read -r filename sha <"${info_file}" 2>/dev/null || true
+              if [[ "${filename}" != "" && "${sha}" =~ ^[0-9a-fA-F]{64}$ && "${actual}" == "${sha}" ]]; then
+                true
+              else
+                err_with_log "Go download checksum verification failed."
+              fi
+            else
+              err_with_log "Go download checksum verification failed."
+            fi
+          else
+            err_with_log "Go download checksum verification failed."
+          fi
+        else
+          err_with_log "Go download checksum verification failed."
+        fi
+      fi
+    else
+      err_with_log "Go download checksum verification failed."
+    fi
   fi
 
   if ! run_quiet "${SUDO_CMD[@]}" rm -rf /usr/local/go; then
