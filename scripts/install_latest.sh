@@ -47,6 +47,32 @@ is_linux() {
   [[ "$(uname -s)" == "Linux" ]]
 }
 
+python_venv_ok() {
+  local tmp
+  tmp="$(mktemp -d)"
+  if run_quiet python3 -m venv "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+      rm -rf "${tmp}"
+      return 0
+    fi
+  fi
+  rm -rf "${tmp}"
+  return 1
+}
+
+python_virtualenv_ok() {
+  local tmp
+  tmp="$(mktemp -d)"
+  if run_quiet python3 -m virtualenv "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+      rm -rf "${tmp}"
+      return 0
+    fi
+  fi
+  rm -rf "${tmp}"
+  return 1
+}
+
 SUDO_CMD=()
 ensure_sudo() {
   if [[ "$(id -u)" -eq 0 ]]; then
@@ -237,19 +263,23 @@ ensure_python_runtime() {
       fi
     fi
 
-    if ! python3 - <<'PY' >/dev/null 2>&1
-import ensurepip, venv
-PY
-    then
-      if need_cmd brew; then
-        if ! run_quiet brew install python; then
-          err_with_log "Python3 venv/ensurepip is missing."
-        fi
-      else
-        err_with_log "Python3 venv is missing. Install Python3 (with venv) and rerun."
-      fi
+    if python_venv_ok; then
+      return 0
     fi
-    return 0
+
+    if need_cmd brew; then
+      if ! run_quiet brew install python; then
+        err_with_log "Python3 venv is missing."
+      fi
+    else
+      err_with_log "Python3 venv is missing. Install Python3 (with venv) and rerun."
+    fi
+
+    if python_venv_ok; then
+      return 0
+    fi
+
+    err_with_log "Python3 venv is still unavailable after installing dependencies."
   fi
 
   if is_linux; then
@@ -281,27 +311,38 @@ PY
       fi
     fi
 
-    if ! python3 - <<'PY' >/dev/null 2>&1
-import ensurepip, venv
-PY
-    then
-      case "${pm}" in
-        apt) install_pkgs_linux "${pm}" python3-venv ;;
-        dnf|yum) install_pkgs_linux "${pm}" python3-virtualenv ;;
-        pacman) install_pkgs_linux "${pm}" python-virtualenv ;;
-        apk) install_pkgs_linux "${pm}" py3-virtualenv ;;
-        zypper|xbps) install_pkgs_linux "${pm}" python3-virtualenv ;;
-        emerge) install_pkgs_linux "${pm}" dev-python/virtualenv ;;
-        *) err "Unsupported Linux distro. Install python venv manually." ;;
-      esac
+    if python_venv_ok; then
+      return 0
     fi
 
-    if ! python3 - <<'PY' >/dev/null 2>&1
-import ensurepip, venv
-PY
-    then
-      err_with_log "Python3 venv/ensurepip is still unavailable after installing dependencies."
+    case "${pm}" in
+      apt) install_pkgs_linux "${pm}" python3-venv ;;
+      dnf|yum) install_pkgs_linux "${pm}" python3-virtualenv ;;
+      pacman) install_pkgs_linux "${pm}" python-virtualenv ;;
+      apk) install_pkgs_linux "${pm}" py3-virtualenv ;;
+      zypper|xbps) install_pkgs_linux "${pm}" python3-virtualenv ;;
+      emerge) install_pkgs_linux "${pm}" dev-python/virtualenv ;;
+      *) err "Unsupported Linux distro. Install python venv manually." ;;
+    esac
+
+    if python_venv_ok; then
+      return 0
     fi
+
+    case "${pm}" in
+      apt) install_pkgs_linux "${pm}" python3-virtualenv ;;
+      dnf|yum|zypper|xbps) install_pkgs_linux "${pm}" python3-virtualenv ;;
+      pacman) install_pkgs_linux "${pm}" python-virtualenv ;;
+      apk) install_pkgs_linux "${pm}" py3-virtualenv ;;
+      emerge) install_pkgs_linux "${pm}" dev-python/virtualenv ;;
+      *) true ;;
+    esac
+
+    if python_virtualenv_ok; then
+      return 0
+    fi
+
+    err_with_log "Python3 venv/virtualenv is still unavailable after installing dependencies."
     return 0
   fi
 
@@ -331,7 +372,11 @@ setup_python_runtime() {
     err_with_log "Failed to create Gimble runtime directory."
   fi
   if ! run_quiet python3 -m venv "${venv_dir}"; then
-    err_with_log "Failed to create Gimble Python venv."
+    if run_quiet python3 -m virtualenv "${venv_dir}"; then
+      true
+    else
+      err_with_log "Failed to create Gimble Python venv."
+    fi
   fi
   if ! run_quiet "${venv_dir}/bin/python3" -m pip install --upgrade pip; then
     err_with_log "Failed to upgrade pip in Gimble venv."
