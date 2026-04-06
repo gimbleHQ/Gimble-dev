@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/assets/gimble-logo.svg" width="160" alt="Gimble logo" />
-</p>
 <h1 align="center">Gimble</h1>
 <p align="center">Live debugging for physical systems. Capture terminal and telemetry, share a live browser session, and get evidence-grounded answers.</p>
 <p align="center">
@@ -44,10 +41,6 @@ gim chat
 ```
 
 Gimble CLI connects to a hosted Gimble Cloud companion that powers chat and evidence retrieval.
-
-<p align="center">
-  <img src="docs/assets/gimble-hero.gif" width="900" alt="Gimble demo" />
-</p>
 
 <p align="center">
   <img src="docs/assets/gimble-story.png" width="900" alt="Gimble CLI to Cloud flow (terminal + live UI)" />
