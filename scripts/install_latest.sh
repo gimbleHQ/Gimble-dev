@@ -91,10 +91,35 @@ python_virtualenv_ok_download() {
 }
 
 python_version_minor() {
-  python3 - <<'PY'
+  local py="${1:-python3}"
+  "${py}" - <<'PY'
 import sys
 print(f"{sys.version_info[0]}.{sys.version_info[1]}")
 PY
+}
+
+python_version_ge() {
+  local py="${1:-python3}"
+  local min_major="${2:-3}"
+  local min_minor="${3:-8}"
+  local ver major minor
+  ver="$("${py}" - <<'PY'
+import sys
+print(f"{sys.version_info[0]}.{sys.version_info[1]}")
+PY
+  )" || return 1
+  major="${ver%%.*}"
+  minor="${ver#*.}"
+  if [[ -z "${major}" || -z "${minor}" ]]; then
+    return 1
+  fi
+  if [[ "${major}" -gt "${min_major}" ]]; then
+    return 0
+  fi
+  if [[ "${major}" -eq "${min_major}" && "${minor}" -ge "${min_minor}" ]]; then
+    return 0
+  fi
+  return 1
 }
 
 select_runtime_python() {
@@ -109,6 +134,9 @@ select_runtime_python() {
     if ! need_cmd "${py}"; then
       continue
     fi
+    if ! python_version_ge "${py}" 3 8; then
+      continue
+    fi
     if python_venv_ok "${py}"; then
       RUNTIME_PY="${py}"
       return 0
@@ -119,6 +147,9 @@ select_runtime_python() {
     if ! need_cmd "${py}"; then
       continue
     fi
+    if ! python_version_ge "${py}" 3 8; then
+      continue
+    fi
     if python_virtualenv_ok "${py}" || python_virtualenv_ok_download "${py}"; then
       RUNTIME_PY="${py}"
       return 0
@@ -126,6 +157,166 @@ select_runtime_python() {
   done
 
   return 1
+}
+
+has_supported_python() {
+  local candidates=()
+  local py
+  candidates+=(python3)
+  for v in 3.12 3.11 3.10 3.9 3.8; do
+    candidates+=("python${v}")
+  done
+  for py in "${candidates[@]}"; do
+    if ! need_cmd "${py}"; then
+      continue
+    fi
+    if python_version_ge "${py}" 3 8; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+go_version_minor() {
+  local ver major minor
+  ver="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')" || return 1
+  major="${ver%%.*}"
+  minor="${ver#*.}"
+  minor="${minor%%.*}"
+  if [[ -z "${major}" || -z "${minor}" ]]; then
+    return 1
+  fi
+  printf "%s.%s" "${major}" "${minor}"
+}
+
+go_version_ok() {
+  if ! need_cmd go; then
+    return 1
+  fi
+  local ver major minor
+  ver="$(go_version_minor)" || return 1
+  major="${ver%%.*}"
+  minor="${ver#*.}"
+  if [[ "${major}" -gt 1 ]]; then
+    return 0
+  fi
+  if [[ "${major}" -eq 1 && "${minor}" -ge 22 ]]; then
+    return 0
+  fi
+  return 1
+}
+
+go_os_arch() {
+  local os arch
+  os="$(uname -s)"
+  case "${os}" in
+    Darwin) os="darwin" ;;
+    Linux) os="linux" ;;
+    *) return 1 ;;
+  esac
+  arch="$(uname -m)"
+  case "${arch}" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    i386|i686) arch="386" ;;
+    armv6l|armv7l) arch="armv6l" ;;
+    *) return 1 ;;
+  esac
+  printf "%s %s" "${os}" "${arch}"
+}
+
+sha256_file() {
+  local file="$1"
+  if need_cmd sha256sum; then
+    sha256sum "${file}" | awk '{print $1}'
+    return 0
+  fi
+  if need_cmd shasum; then
+    shasum -a 256 "${file}" | awk '{print $1}'
+    return 0
+  fi
+  return 1
+}
+
+install_go_tarball() {
+  ensure_sudo
+
+  local os arch tmp json_file info_file filename sha url actual
+  read -r os arch < <(go_os_arch) || err "Unsupported OS/arch for Go install."
+
+  tmp="$(mktemp -d)"
+  json_file="${tmp}/go.json"
+  info_file="${tmp}/go.info"
+
+  if ! run_quiet curl -fsSL "https://go.dev/dl/?mode=json" -o "${json_file}"; then
+    err_with_log "Failed to download Go release manifest."
+  fi
+
+  local pybin=""
+  if need_cmd python3; then
+    pybin="python3"
+  elif need_cmd python; then
+    pybin="python"
+  else
+    err "Python is required to resolve Go download metadata. Install python3 or install Go manually."
+  fi
+
+  init_log
+  if ! "${pybin}" - "${json_file}" "${os}" "${arch}" >"${info_file}" 2>>"${LOG_FILE}" <<'PY'
+import json
+import sys
+
+path, os_name, arch = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+for rel in data:
+    version = rel.get("version", "")
+    if not version.startswith("go1.22."):
+        continue
+    for fobj in rel.get("files", []):
+        if fobj.get("kind") != "archive":
+            continue
+        if fobj.get("os") == os_name and fobj.get("arch") == arch:
+            print(fobj.get("filename", ""), fobj.get("sha256", ""))
+            sys.exit(0)
+sys.exit(1)
+PY
+  then
+    err_with_log "Failed to resolve Go 1.22.x download for ${os}/${arch}."
+  fi
+
+  read -r filename sha <"${info_file}"
+  if [[ -z "${filename}" || -z "${sha}" ]]; then
+    err_with_log "Go download metadata was incomplete."
+  fi
+
+  url="https://go.dev/dl/${filename}"
+  if ! run_quiet curl -fsSL "${url}" -o "${tmp}/${filename}"; then
+    err_with_log "Failed to download Go ${filename}."
+  fi
+
+  actual="$(sha256_file "${tmp}/${filename}" || true)"
+  if [[ -z "${actual}" ]]; then
+    err "sha256sum or shasum is required to verify Go download."
+  fi
+  if [[ "${actual}" != "${sha}" ]]; then
+    err_with_log "Go download checksum verification failed."
+  fi
+
+  if ! run_quiet "${SUDO_CMD[@]}" rm -rf /usr/local/go; then
+    err_with_log "Failed to remove existing /usr/local/go."
+  fi
+  if ! run_quiet "${SUDO_CMD[@]}" tar -C /usr/local -xzf "${tmp}/${filename}"; then
+    err_with_log "Failed to extract Go tarball."
+  fi
+  if ! run_quiet "${SUDO_CMD[@]}" mkdir -p /usr/local/bin; then
+    err_with_log "Failed to create /usr/local/bin."
+  fi
+  if ! run_quiet "${SUDO_CMD[@]}" ln -sf /usr/local/go/bin/go /usr/local/bin/go; then
+    err_with_log "Failed to link go binary."
+  fi
+  export PATH="/usr/local/go/bin:${PATH}"
 }
 
 SUDO_CMD=()
@@ -306,29 +497,38 @@ resolve_latest_tag() {
 
 
 install_go_if_missing() {
-  if need_cmd go; then
+  if go_version_ok; then
     return 0
   fi
 
   if is_darwin; then
-    need_cmd brew || err "Go is required. Install Homebrew first or install Go manually."
-    if ! run_quiet brew install go; then
-      err_with_log "Failed to install Go with Homebrew."
+    if need_cmd brew; then
+      if need_cmd go; then
+        if ! run_quiet brew upgrade go; then
+          err_with_log "Failed to upgrade Go with Homebrew."
+        fi
+      else
+        if ! run_quiet brew install go; then
+          err_with_log "Failed to install Go with Homebrew."
+        fi
+      fi
+      if go_version_ok; then
+        return 0
+      fi
     fi
-    return 0
+    install_go_tarball
+    if go_version_ok; then
+      return 0
+    fi
+    err_with_log "Go 1.22+ is required but could not be installed."
   fi
 
   if is_linux; then
-    local pm
-    pm="$(detect_pkg_manager)" || err "Unsupported Linux distro. Install Go manually."
-    case "${pm}" in
-      apt) install_pkgs_linux "${pm}" golang-go ;;
-      dnf|yum) install_pkgs_linux "${pm}" golang ;;
-      pacman|apk|zypper|xbps) install_pkgs_linux "${pm}" go ;;
-      emerge) install_pkgs_linux "${pm}" dev-lang/go ;;
-      *) err "Unsupported Linux distro. Install Go manually." ;;
-    esac
-    return 0
+    install_go_tarball
+    if go_version_ok; then
+      return 0
+    fi
+    err_with_log "Go 1.22+ is required but could not be installed."
   fi
 
   err "Go is required to build Gimble. Install Go and rerun this script."
@@ -355,8 +555,12 @@ ensure_python_runtime() {
       fi
     fi
 
+    if ! has_supported_python; then
+      err "Python 3.8+ is required. Install a newer Python version and rerun."
+    fi
+
     local py_ver
-    py_ver="$(python_version_minor)"
+    py_ver="$(python_version_minor python3)"
     if [[ "${pm}" == "apt" && -n "${py_ver}" ]]; then
       install_pkgs_linux_best_effort "${pm}" "python${py_ver}-venv" "python${py_ver}-distutils" "python${py_ver}-dev"
     fi
@@ -377,7 +581,7 @@ ensure_python_runtime() {
       return 0
     fi
 
-    err_with_log "Python3 venv is still unavailable after installing dependencies."
+    err_with_log "Python 3.8+ venv is still unavailable after installing dependencies."
   fi
 
   if is_linux; then
@@ -407,6 +611,10 @@ ensure_python_runtime() {
           *) err "Unsupported Linux distro. Install pip manually." ;;
         esac
       fi
+    fi
+
+    if ! has_supported_python; then
+      err "Python 3.8+ is required. Install a newer Python version and rerun."
     fi
 
     if select_runtime_python; then
@@ -440,7 +648,7 @@ ensure_python_runtime() {
       return 0
     fi
 
-    err_with_log "Python3 venv/virtualenv is still unavailable after installing dependencies."
+    err_with_log "Python 3.8+ venv/virtualenv is still unavailable after installing dependencies."
     return 0
   fi
 
