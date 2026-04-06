@@ -1,4 +1,4 @@
-# Gimble Data Sharing and Privacy Policy (Experimental)
+# Gimble Data Sharing and Privacy Policy
 
 Last updated: 2026-04-06
 
@@ -23,7 +23,7 @@ Gimble stores configuration locally on your machine. When cloud features are ena
 
 ## 4. Data Security and Retention
 
-We take reasonable efforts to keep data within a closed system and to protect user data. However, due to the experimental nature of this project, we cannot guarantee the confidentiality, integrity, or availability of any data. Data may be retained for debugging, analytics, or operational purposes as needed to support the service.
+We take strong efforts to keep data within a closed system and to protect user data. However, due to the experimental nature of this project, we cannot guarantee the confidentiality, integrity, or availability of any data. Data may be retained for debugging, analytics, or operational purposes as needed to support the service.
 
 ## 5. Experimental Project Disclaimer
 
