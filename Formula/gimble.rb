@@ -3,7 +3,7 @@ class Gimble < Formula
   homepage "https://github.com/gimbleHQ/Gimble-dev"
   version "1.0.0"
   url "https://github.com/gimbleHQ/Gimble-dev/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "8ca60b45504fcdb40787194608cfceab7454038dee0cc2da32b934649d6d9710"
+  sha256 "6e41203be2b7f916ea462d0e4ebc6bbfe78e455aaed95bad3b32ee0706272289"
   license "MIT"
 
   depends_on "go" => :build
