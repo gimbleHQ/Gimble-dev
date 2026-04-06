@@ -267,21 +267,37 @@ install_go_tarball() {
   json_file="${tmp}/go.json"
   info_file="${tmp}/go.info"
 
-  if ! run_quiet curl -fsSL "https://go.dev/dl/?mode=json" -o "${json_file}"; then
-    err_with_log "Failed to download Go release manifest."
-  fi
-
-  local pybin=""
-  if need_cmd python3; then
-    pybin="python3"
-  elif need_cmd python; then
-    pybin="python"
-  else
-    err "Python is required to resolve Go download metadata. Install python3 or install Go manually."
-  fi
-
   init_log
-  if ! "${pybin}" - "${json_file}" "${os}" "${arch}" >"${info_file}" 2>>"${LOG_FILE}" <<'PY'
+  local version_line version_minor
+  version_line="$(curl -fsSL "https://go.dev/VERSION?m=text" 2>>"${LOG_FILE}" || curl -fsSL "https://golang.org/VERSION?m=text" 2>>"${LOG_FILE}" || true)"
+  version_line="$(printf "%s" "${version_line}" | head -n1 | tr -d '\r\n')"
+  if [[ "${version_line}" =~ ^go1\. ]]; then
+    version_minor="${version_line#go1.}"
+    version_minor="${version_minor%%.*}"
+    if [[ -n "${version_minor}" && "${version_minor}" -ge 22 ]]; then
+      filename="${version_line}.${os}-${arch}.tar.gz"
+      sha="$(curl -fsSL "https://go.dev/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+      if [[ -z "${sha}" ]]; then
+        sha="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
+      fi
+    fi
+  fi
+
+  if [[ -z "${filename}" || -z "${sha}" ]]; then
+    if ! run_quiet curl -fsSL "https://go.dev/dl/?mode=json" -o "${json_file}"; then
+      err_with_log "Failed to download Go release manifest."
+    fi
+
+    local pybin=""
+    if need_cmd python3; then
+      pybin="python3"
+    elif need_cmd python; then
+      pybin="python"
+    else
+      err "Python is required to resolve Go download metadata. Install python3 or install Go manually."
+    fi
+
+    if ! "${pybin}" - "${json_file}" "${os}" "${arch}" >"${info_file}" 2>>"${LOG_FILE}" <<'PY'
 import json
 import sys
 
@@ -331,26 +347,11 @@ if filename and sha:
     sys.exit(0)
 sys.exit(1)
 PY
-  then
-    true
-  fi
-
-  read -r filename sha <"${info_file}" 2>/dev/null || true
-  if [[ -z "${filename}" || -z "${sha}" ]]; then
-    local version_line version_minor
-    version_line="$(curl -fsSL "https://go.dev/VERSION?m=text" 2>>"${LOG_FILE}" || curl -fsSL "https://golang.org/VERSION?m=text" 2>>"${LOG_FILE}" || true)"
-    version_line="$(printf "%s" "${version_line}" | head -n1 | tr -d '\r\n')"
-    if [[ "${version_line}" =~ ^go1\. ]]; then
-      version_minor="${version_line#go1.}"
-      version_minor="${version_minor%%.*}"
-      if [[ -n "${version_minor}" && "${version_minor}" -ge 22 ]]; then
-        filename="${version_line}.${os}-${arch}.tar.gz"
-        sha="$(curl -fsSL "https://go.dev/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
-        if [[ -z "${sha}" ]]; then
-          sha="$(curl -fsSL "https://golang.org/dl/${filename}.sha256" 2>>"${LOG_FILE}" | awk '{print $1}' || true)"
-        fi
-      fi
+    then
+      true
     fi
+
+    read -r filename sha <"${info_file}" 2>/dev/null || true
   fi
 
   if [[ -z "${filename}" || -z "${sha}" ]]; then
