@@ -1,8 +1,8 @@
-<h1 align="center">Gimble</h1>
-<p align="center">Live debugging for physical systems. Capture terminal and telemetry, share a live browser session, and get evidence-grounded answers.</p>
+<h1 align="center">Gimble CLI</h1>
+<p align="center">AI debugging for physical systems. Capture logs and telemetry, share a live browser session, and get evidence-grounded answers.</p>
 <p align="center">
   <a href="https://gimble.dev">Website</a> ·
-  <a href="https://chat.gimble.dev">Live UI</a> ·
+  <!-- <a href="https://chat.gimble.dev">Live UI</a> · -->
   <a href="docs/">Docs</a> ·
   <a href="https://github.com/Saketspradhan/Gimble-dev/issues">Issues</a>
 </p>
