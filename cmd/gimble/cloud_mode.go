@@ -213,6 +213,7 @@ func googleDeviceFlow(apiBase, token, userID, username string) error {
 		return err
 	}
 	fmt.Println("\nGoogle sign-in required for additional security.")
+	fmt.Println()
 	fmt.Printf("Open: %s\n", start.VerificationURL)
 	fmt.Printf("Enter code: %s\n\n", start.UserCode)
 
