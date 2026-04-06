@@ -208,13 +208,13 @@ go_version_ok() {
 
 go_os_arch() {
   local os arch
-  os="$(uname -s)"
+  os="$(uname -s 2>/dev/null | tr -d '\r' | xargs)" || return 1
   case "${os}" in
     Darwin) os="darwin" ;;
     Linux) os="linux" ;;
     *) return 1 ;;
   esac
-  arch="$(uname -m)"
+  arch="$(uname -m 2>/dev/null | tr -d '\r' | xargs)" || return 1
   case "${arch}" in
     x86_64|amd64) arch="amd64" ;;
     aarch64|arm64) arch="arm64" ;;
@@ -242,7 +242,7 @@ install_go_tarball() {
   ensure_sudo
 
   local os arch tmp json_file info_file filename sha url actual
-  read -r os arch < <(go_os_arch) || err "Unsupported OS/arch for Go install."
+  read -r os arch < <(go_os_arch) || err "Unsupported OS/arch for Go install (expected darwin/linux + amd64/arm64)."
 
   tmp="$(mktemp -d)"
   json_file="${tmp}/go.json"
