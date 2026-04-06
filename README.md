@@ -109,8 +109,8 @@ This is a passion project born out of our frustration with unreliable systems, a
 
 Regards, S & R.
 
-Email: [gimble256@gmail.com](mailto:gimble256@gmail.com).
+Email: [gimble256@gmail.com](mailto:gimble256@gmail.com)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE)
