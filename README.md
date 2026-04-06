@@ -27,6 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/gimbleHQ/Gimble-dev/main/scripts/in
 ```
 
 Then finish **first-time setup** (the installer or `gimble setup` will guide you).
+Gimble setup requires accepting the data/privacy policy. See `/docs/privacy_policy.md`.
 
 **Start a session** (normal terminal):
 

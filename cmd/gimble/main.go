@@ -618,6 +618,10 @@ func runSetupWizard() error {
 	}
 
 	printSetupBanner()
+	printSetupSection("Privacy Policy")
+	fmt.Println("By entering/accepting or saying yes [y], you agree to Gimble's Data Sharing and Privacy Policy.")
+	fmt.Println("You can read it here: /docs/privacy_policy.md")
+	fmt.Println()
 	printSetupSection("Profile")
 
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
@@ -627,6 +631,15 @@ func runSetupWizard() error {
 	defer tty.Close()
 
 	reader := bufio.NewReader(tty)
+
+	consentRaw, err := promptOptional(reader, "Type yes [y] or press Enter to accept (anything else to abort)")
+	if err != nil {
+		return err
+	}
+	consent := strings.ToLower(strings.TrimSpace(consentRaw))
+	if consent != "" && consent != "y" && consent != "yes" {
+		return fmt.Errorf("privacy policy consent not accepted; setup aborted")
+	}
 
 	name, err := promptRequired(reader, "User name")
 	if err != nil {
