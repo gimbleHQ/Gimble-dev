@@ -289,20 +289,50 @@ path, os_name, arch = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, "r", encoding="utf-8") as f:
     data = json.load(f)
 
-for rel in data:
-    version = rel.get("version", "")
-    if not version.startswith("go1.22."):
-        continue
-    for fobj in rel.get("files", []):
-        if fobj.get("kind") != "archive":
+def pick_release(releases, want_minor=None):
+    for rel in releases:
+        version = rel.get("version", "")
+        if not version.startswith("go1."):
             continue
-        if fobj.get("os") == os_name and fobj.get("arch") == arch:
-            print(fobj.get("filename", ""), fobj.get("sha256", ""))
-            sys.exit(0)
+        if want_minor is not None and not version.startswith(f"go1.{want_minor}."):
+            continue
+        for fobj in rel.get("files", []):
+            if fobj.get("kind") != "archive":
+                continue
+            if fobj.get("os") == os_name and fobj.get("arch") == arch:
+                return fobj.get("filename", ""), fobj.get("sha256", "")
+    return "", ""
+
+# Prefer latest 1.22.x; if not available, fall back to latest >=1.22.
+filename, sha = pick_release(data, want_minor=22)
+if not filename:
+    for rel in data:
+        version = rel.get("version", "")
+        if not version.startswith("go1."):
+            continue
+        parts = version[3:].split(".", 1)
+        try:
+            minor = int(parts[0])
+        except Exception:
+            continue
+        if minor < 22:
+            continue
+        for fobj in rel.get("files", []):
+            if fobj.get("kind") != "archive":
+                continue
+            if fobj.get("os") == os_name and fobj.get("arch") == arch:
+                filename, sha = fobj.get("filename", ""), fobj.get("sha256", "")
+                break
+        if filename:
+            break
+
+if filename and sha:
+    print(filename, sha)
+    sys.exit(0)
 sys.exit(1)
 PY
   then
-    err_with_log "Failed to resolve Go 1.22.x download for ${os}/${arch}."
+    err_with_log "Failed to resolve Go 1.22+ download for ${os}/${arch}."
   fi
 
   read -r filename sha <"${info_file}"
