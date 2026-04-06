@@ -619,12 +619,6 @@ ensure_python_runtime() {
       err "Python 3.8+ is required. Install a newer Python version and rerun."
     fi
 
-    local py_ver
-    py_ver="$(python_version_minor python3)"
-    if [[ "${pm}" == "apt" && -n "${py_ver}" ]]; then
-      install_pkgs_linux_best_effort "${pm}" "python${py_ver}-venv" "python${py_ver}-distutils" "python${py_ver}-dev"
-    fi
-
     if select_runtime_python; then
       return 0
     fi
