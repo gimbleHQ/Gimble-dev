@@ -24,7 +24,7 @@ go build -o ./gimble ./cmd/gimble
 
 If you find a bug or want a feature:
 
-- Search [existing issues](https://github.com/Saketspradhan/Gimble-dev/issues) first.
+- Search [existing issues](https://github.com/gimbleHQ/Gimble-dev/issues) first.
 - Include clear repro steps, expected behavior, and your environment.
 - Screenshots or logs are extremely helpful.
 

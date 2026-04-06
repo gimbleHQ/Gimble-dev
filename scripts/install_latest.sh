@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${GIMBLE_REPO:-Saketspradhan/Gimble-dev}"
+REPO="${GIMBLE_REPO:-gimbleHQ/Gimble-dev}"
 API_BASE="https://api.github.com/repos/${REPO}"
 
 log() { printf "%s\n" "$*"; }
@@ -9,6 +9,16 @@ err() { printf "ERROR: %s\n" "$*" >&2; exit 1; }
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+normalize_tag() {
+  local raw="${1:-}"
+  [[ -n "${raw}" ]] || return 1
+  if [[ "${raw}" == v* ]]; then
+    printf "%s" "${raw}"
+  else
+    printf "v%s" "${raw}"
+  fi
 }
 
 resolve_latest_tag() {
@@ -131,7 +141,16 @@ main() {
   local tag version tarball url srcdir
   tmpdir=""
 
-  tag="$(resolve_latest_tag)"
+  if [[ -n "${GIMBLE_TAG:-}" ]]; then
+    tag="$(normalize_tag "${GIMBLE_TAG}")" || err "Invalid GIMBLE_TAG: '${GIMBLE_TAG}'"
+    log "Using requested tag ${tag}"
+  elif [[ $# -gt 0 && -n "${1:-}" ]]; then
+    tag="$(normalize_tag "${1}")" || err "Invalid tag argument: '${1}'"
+    log "Using requested tag ${tag}"
+  else
+    tag="$(resolve_latest_tag)"
+  fi
+
   version="${tag#v}"
   url="https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz"
 

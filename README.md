@@ -4,12 +4,12 @@
   <a href="https://gimble.dev">Website</a> ·
   <!-- <a href="https://chat.gimble.dev">Live UI</a> · -->
   <a href="docs/">Docs</a> ·
-  <a href="https://github.com/Saketspradhan/Gimble-dev/issues">Issues</a>
+  <a href="https://github.com/gimbleHQ/Gimble-dev/issues">Issues</a>
 </p>
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-111111" alt="Platform" />
-  <a href="https://github.com/Saketspradhan/Gimble-dev/releases/latest"><img src="https://img.shields.io/github/v/release/Saketspradhan/Gimble-dev?display_name=tag" alt="Latest Release" /></a>
+  <a href="https://github.com/gimbleHQ/Gimble-dev/releases/latest"><img src="https://img.shields.io/github/v/release/gimbleHQ/Gimble-dev?display_name=tag" alt="Latest Release" /></a>
 </p>
 
 Gimble is a free, open-source CLI for debugging physical systems. It captures terminal and log context, ingests live telemetry and system state—so engineers can get answers grounded in real events and fix issues faster without digging through thousands of log lines.
@@ -23,7 +23,13 @@ Gimble is a free, open-source CLI for debugging physical systems. It captures te
 Install (Linux + macOS):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Saketspradhan/Gimble-dev/main/scripts/install_latest.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gimbleHQ/Gimble-dev/main/scripts/install_latest.sh | bash
+```
+
+Install a specific release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gimbleHQ/Gimble-dev/main/scripts/install_latest.sh | GIMBLE_TAG=v1.0.0 bash
 ```
 
 Then finish **first-time setup** (the installer or `gimble setup` will guide you).
@@ -103,10 +109,8 @@ We welcome contributions. Please read the [Contributing Guide](CONTRIBUTING.md) 
 
 ## Support
 
-We love support from the community and appreciate you taking the time to try Gimble — thank you. 
+We love support from the community and appreciate you taking the time to try Gimble — thank you. This is a passion project born out of our frustration with unreliable systems, and we’re working hard to keep it free and open-source for everyone. We currently cover the compute costs ourselves and rely on free-tier cloud resources, so heavy usage can occasionally trigger rate limits. If that happens, please reach out — we’d love to help and figure out a way to support your use case. &hearts;
 
-This is a passion project born out of our frustration with unreliable systems, and we’re trying our best to keep it free and open-source for everyone. We currently cover the compute costs ourselves and rely on free-tier cloud resources, so heavy usage can occasionally trigger rate limits. If that happens, please reach out to us [here](mailto:gimble256@gmail.com) — we’d love to discuss and figure out a way to support your use case. 
+**Issues & feature requests** — [GitHub Issues](https://github.com/gimbleHQ/Gimble-dev/issues).
 
-Email: [gimble256@gmail.com](mailto:gimble256@gmail.com)
-
-Regards, S & R.
+**Email** — [gimble256@gmail.com](mailto:gimble256@gmail.com).

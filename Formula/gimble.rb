@@ -1,8 +1,8 @@
 class Gimble < Formula
   desc "Gimble CLI"
-  homepage "https://github.com/Saketspradhan/Gimble-dev"
+  homepage "https://github.com/gimbleHQ/Gimble-dev"
   version "0.6.0"
-  url "https://github.com/Saketspradhan/Gimble-dev/archive/refs/tags/v0.6.0.tar.gz"
+  url "https://github.com/gimbleHQ/Gimble-dev/archive/refs/tags/v0.6.0.tar.gz"
   sha256 "5948c961d6e9129a7d6f9295c21f8ab029230d3e6879c0199263a97eb96d522f"
   license "MIT"
 
