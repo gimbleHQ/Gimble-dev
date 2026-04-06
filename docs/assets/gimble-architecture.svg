@@ -3,11 +3,15 @@
   <rect x="40" y="80" width="220" height="120" rx="14" fill="#141414" stroke="#2A2A2A"/>
   <rect x="370" y="60" width="220" height="160" rx="14" fill="#141414" stroke="#2A2A2A"/>
   <rect x="700" y="80" width="220" height="120" rx="14" fill="#141414" stroke="#2A2A2A"/>
-  <text x="150" y="132" fill="#EDEDED" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">Gimble CLI</text>
+  <text x="150" y="122" fill="#EDEDED" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">Gimble CLI</text>
+  <text x="150" y="144" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="12" text-anchor="middle">Capture logs + telemetry</text>
+  <text x="150" y="162" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="12" text-anchor="middle">Session + uploader</text>
   <text x="480" y="116" fill="#EDEDED" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">Gimble Cloud</text>
   <text x="480" y="142" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle">Ingest • Normalize • Retrieve</text>
   <text x="480" y="166" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle">Evidence • Summaries</text>
-  <text x="810" y="132" fill="#EDEDED" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">Browser UI</text>
+  <text x="810" y="122" fill="#EDEDED" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">Browser UI</text>
+  <text x="810" y="144" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="12" text-anchor="middle">Live chat</text>
+  <text x="810" y="162" fill="#9FA1A7" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="12" text-anchor="middle">Evidence + citations</text>
   <path d="M260 140 H360" stroke="#00D687" stroke-width="3"/>
   <path d="M590 140 H700" stroke="#00D687" stroke-width="3"/>
   <circle cx="310" cy="140" r="4" fill="#00D687"/>

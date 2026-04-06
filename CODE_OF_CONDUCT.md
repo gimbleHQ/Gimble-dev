@@ -23,7 +23,7 @@ This Code of Conduct applies to all project spaces, including GitHub issues, pul
 
 ## Enforcement
 
-If you experience or witness unacceptable behavior, please report it to the maintainers at `dev@gimble.dev`. All reports will be reviewed and investigated promptly and fairly.
+If you experience or witness unacceptable behavior, please report it to the maintainers at `gimble256@gmail.com`. All reports will be reviewed and investigated promptly and fairly.
 
 Project maintainers are responsible for clarifying standards and will take appropriate and fair corrective action.
 

@@ -1,9 +1,13 @@
-# Docs
+# Gimble Docs
 
-This folder contains a short expanded reference for Gimble. Use these files for quick lookups:
+Welcome! This folder contains short, practical references for Gimble. If you're getting started, begin with **Commands** and **Troubleshooting**.
 
-- `commands.md` — detailed command reference and examples
-- `env.md` — environment variables and local config locations
-- `troubleshooting.md` — common first-run issues and fixes
+## Quick Index
 
-If you'd like more sections (architecture, contribution guide, API reference), tell me which to add.
+| Doc | What you'll find |
+|-----|-----------------|
+| **[commands.md](commands.md)** | All CLI commands, profiles, and usage examples |
+| **[env.md](env.md)** | Config paths, `chat.env`, proxies, and local state |
+| **[troubleshooting.md](troubleshooting.md)** | PATH, permissions, install issues, and network tips |
+
+If you need anything missing, open an issue and tell us what you'd like added.
