@@ -765,8 +765,22 @@ install_python_assets() {
     target_dir="${HOME}/.local/share/gimble"
   fi
 
-  mkdir -p "${target_dir}"
-  cp -R "${srcdir}/python" "${target_dir}/"
+  if mkdir -p "${target_dir}" 2>/dev/null; then
+    if ! cp -R "${srcdir}/python" "${target_dir}/"; then
+      err "Failed to install python assets to ${target_dir}."
+    fi
+  else
+    if need_cmd sudo; then
+      if ! sudo mkdir -p "${target_dir}"; then
+        err "Failed to create ${target_dir}. Run with sudo or choose a writable path."
+      fi
+      if ! sudo cp -R "${srcdir}/python" "${target_dir}/"; then
+        err "Failed to install python assets to ${target_dir} with sudo."
+      fi
+    else
+      err "Permission denied creating ${target_dir}. Install with sudo or choose a writable path."
+    fi
+  fi
   log "Installed python assets to ${target_dir}/python"
 }
 
