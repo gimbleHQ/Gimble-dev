@@ -73,6 +73,26 @@ python_virtualenv_ok() {
   return 1
 }
 
+python_virtualenv_ok_download() {
+  local tmp
+  tmp="$(mktemp -d)"
+  if run_quiet python3 -m virtualenv --download "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+      rm -rf "${tmp}"
+      return 0
+    fi
+  fi
+  rm -rf "${tmp}"
+  return 1
+}
+
+python_version_minor() {
+  python3 - <<'PY'
+import sys
+print(f"{sys.version_info[0]}.{sys.version_info[1]}")
+PY
+}
+
 SUDO_CMD=()
 ensure_sudo() {
   if [[ "$(id -u)" -eq 0 ]]; then
@@ -178,6 +198,43 @@ install_pkgs_linux() {
   esac
 }
 
+install_pkgs_linux_best_effort() {
+  local pm="$1"
+  shift
+  local pkgs=("$@")
+  ensure_sudo
+
+  case "${pm}" in
+    apt)
+      run_quiet "${SUDO_CMD[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}" || true
+      ;;
+    dnf)
+      run_quiet "${SUDO_CMD[@]}" dnf install -y "${pkgs[@]}" || true
+      ;;
+    yum)
+      run_quiet "${SUDO_CMD[@]}" yum install -y "${pkgs[@]}" || true
+      ;;
+    pacman)
+      run_quiet "${SUDO_CMD[@]}" pacman -Sy --noconfirm "${pkgs[@]}" || true
+      ;;
+    apk)
+      run_quiet "${SUDO_CMD[@]}" apk add --no-cache "${pkgs[@]}" || true
+      ;;
+    zypper)
+      run_quiet "${SUDO_CMD[@]}" zypper --non-interactive install -y "${pkgs[@]}" || true
+      ;;
+    xbps)
+      run_quiet "${SUDO_CMD[@]}" xbps-install -Sy "${pkgs[@]}" || true
+      ;;
+    emerge)
+      run_quiet "${SUDO_CMD[@]}" emerge -n "${pkgs[@]}" || true
+      ;;
+    *)
+      true
+      ;;
+  esac
+}
+
 normalize_tag() {
   local raw="${1:-}"
   [[ -n "${raw}" ]] || return 1
@@ -263,6 +320,12 @@ ensure_python_runtime() {
       fi
     fi
 
+    local py_ver
+    py_ver="$(python_version_minor)"
+    if [[ "${pm}" == "apt" && -n "${py_ver}" ]]; then
+      install_pkgs_linux_best_effort "${pm}" "python${py_ver}-venv" "python${py_ver}-distutils" "python${py_ver}-dev"
+    fi
+
     if python_venv_ok; then
       return 0
     fi
@@ -338,7 +401,7 @@ ensure_python_runtime() {
       *) true ;;
     esac
 
-    if python_virtualenv_ok; then
+    if python_virtualenv_ok || python_virtualenv_ok_download; then
       return 0
     fi
 
@@ -372,7 +435,7 @@ setup_python_runtime() {
     err_with_log "Failed to create Gimble runtime directory."
   fi
   if ! run_quiet python3 -m venv "${venv_dir}"; then
-    if run_quiet python3 -m virtualenv "${venv_dir}"; then
+    if run_quiet python3 -m virtualenv --download "${venv_dir}" || run_quiet python3 -m virtualenv "${venv_dir}"; then
       true
     else
       err_with_log "Failed to create Gimble Python venv."
