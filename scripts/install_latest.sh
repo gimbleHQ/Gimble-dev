@@ -4,11 +4,152 @@ set -euo pipefail
 REPO="${GIMBLE_REPO:-gimbleHQ/Gimble-dev}"
 API_BASE="https://api.github.com/repos/${REPO}"
 
+LOG_FILE=""
+
 log() { printf "%s\n" "$*"; }
 err() { printf "ERROR: %s\n" "$*" >&2; exit 1; }
+err_with_log() {
+  local msg="$1"
+  printf "ERROR: %s\n" "${msg}" >&2
+  if [[ -n "${LOG_FILE:-}" ]]; then
+    printf "See log: %s\n" "${LOG_FILE}" >&2
+  fi
+  exit 1
+}
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+init_log() {
+  if [[ -n "${LOG_FILE:-}" ]]; then
+    return 0
+  fi
+  LOG_FILE="$(mktemp -t gimble-install.XXXXXX 2>/dev/null || mktemp "/tmp/gimble-install.XXXXXX")"
+}
+
+run_quiet() {
+  init_log
+  "$@" >>"${LOG_FILE}" 2>&1
+}
+
+cleanup_log() {
+  if [[ -n "${LOG_FILE:-}" && -f "${LOG_FILE}" ]]; then
+    rm -f "${LOG_FILE}"
+  fi
+}
+
+is_darwin() {
+  [[ "$(uname -s)" == "Darwin" ]]
+}
+
+is_linux() {
+  [[ "$(uname -s)" == "Linux" ]]
+}
+
+SUDO_CMD=()
+ensure_sudo() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    SUDO_CMD=()
+    return 0
+  fi
+  if need_cmd sudo; then
+    SUDO_CMD=(sudo)
+    return 0
+  fi
+  err "sudo is required to install dependencies. Install Go/Python manually or rerun as root."
+}
+
+detect_pkg_manager() {
+  if need_cmd apt-get; then
+    echo "apt"
+    return 0
+  fi
+  if need_cmd dnf; then
+    echo "dnf"
+    return 0
+  fi
+  if need_cmd yum; then
+    echo "yum"
+    return 0
+  fi
+  if need_cmd pacman; then
+    echo "pacman"
+    return 0
+  fi
+  if need_cmd apk; then
+    echo "apk"
+    return 0
+  fi
+  if need_cmd zypper; then
+    echo "zypper"
+    return 0
+  fi
+  if need_cmd xbps-install; then
+    echo "xbps"
+    return 0
+  fi
+  if need_cmd emerge; then
+    echo "emerge"
+    return 0
+  fi
+  return 1
+}
+
+install_pkgs_linux() {
+  local pm="$1"
+  shift
+  local pkgs=("$@")
+  ensure_sudo
+
+  case "${pm}" in
+    apt)
+      if ! run_quiet "${SUDO_CMD[@]}" env DEBIAN_FRONTEND=noninteractive apt-get update -y; then
+        err_with_log "Failed to update apt package index."
+      fi
+      if ! run_quiet "${SUDO_CMD[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with apt."
+      fi
+      ;;
+    dnf)
+      if ! run_quiet "${SUDO_CMD[@]}" dnf install -y "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with dnf."
+      fi
+      ;;
+    yum)
+      if ! run_quiet "${SUDO_CMD[@]}" yum install -y "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with yum."
+      fi
+      ;;
+    pacman)
+      if ! run_quiet "${SUDO_CMD[@]}" pacman -Sy --noconfirm "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with pacman."
+      fi
+      ;;
+    apk)
+      if ! run_quiet "${SUDO_CMD[@]}" apk add --no-cache "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with apk."
+      fi
+      ;;
+    zypper)
+      if ! run_quiet "${SUDO_CMD[@]}" zypper --non-interactive install -y "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with zypper."
+      fi
+      ;;
+    xbps)
+      if ! run_quiet "${SUDO_CMD[@]}" xbps-install -Sy "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with xbps-install."
+      fi
+      ;;
+    emerge)
+      if ! run_quiet "${SUDO_CMD[@]}" emerge -n "${pkgs[@]}"; then
+        err_with_log "Failed to install packages with emerge."
+      fi
+      ;;
+    *)
+      err "Unsupported package manager on Linux. Install dependencies manually."
+      ;;
+  esac
 }
 
 normalize_tag() {
@@ -51,44 +192,153 @@ install_go_if_missing() {
     return 0
   fi
 
-  local os
-  os="$(uname -s)"
-
-  if [[ "${os}" == "Darwin" ]]; then
+  if is_darwin; then
     need_cmd brew || err "Go is required. Install Homebrew first or install Go manually."
-    log "Go not found. Installing Go with Homebrew..."
-    brew install go
+    if ! run_quiet brew install go; then
+      err_with_log "Failed to install Go with Homebrew."
+    fi
     return 0
   fi
 
-  if [[ "${os}" == "Linux" ]]; then
-    if need_cmd apt-get; then
-      log "Go not found. Installing Go with apt..."
-      sudo apt-get update -y
-      sudo apt-get install -y golang-go
-      return 0
-    fi
-
-    if need_cmd dnf; then
-      log "Go not found. Installing Go with dnf..."
-      sudo dnf install -y golang
-      return 0
-    fi
-
-    if need_cmd yum; then
-      log "Go not found. Installing Go with yum..."
-      sudo yum install -y golang
-      return 0
-    fi
-
-    if need_cmd pacman; then
-      log "Go not found. Installing Go with pacman..."
-      sudo pacman -Sy --noconfirm go
-      return 0
-    fi
+  if is_linux; then
+    local pm
+    pm="$(detect_pkg_manager)" || err "Unsupported Linux distro. Install Go manually."
+    case "${pm}" in
+      apt) install_pkgs_linux "${pm}" golang-go ;;
+      dnf|yum) install_pkgs_linux "${pm}" golang ;;
+      pacman|apk|zypper|xbps) install_pkgs_linux "${pm}" go ;;
+      emerge) install_pkgs_linux "${pm}" dev-lang/go ;;
+      *) err "Unsupported Linux distro. Install Go manually." ;;
+    esac
+    return 0
   fi
 
   err "Go is required to build Gimble. Install Go and rerun this script."
+}
+
+ensure_python_runtime() {
+  if is_darwin; then
+    if ! need_cmd python3; then
+      need_cmd brew || err "Python3 is required. Install Homebrew first or install Python manually."
+      if ! run_quiet brew install python; then
+        err_with_log "Failed to install Python3 with Homebrew."
+      fi
+    fi
+
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+      if ! run_quiet python3 -m ensurepip --upgrade; then
+        if need_cmd brew; then
+          if ! run_quiet brew install python; then
+            err_with_log "Failed to provision pip for Python3."
+          fi
+        else
+          err_with_log "Python3 pip is missing. Install Python3 (with pip) and rerun."
+        fi
+      fi
+    fi
+
+    if ! python3 - <<'PY' >/dev/null 2>&1
+import ensurepip, venv
+PY
+    then
+      if need_cmd brew; then
+        if ! run_quiet brew install python; then
+          err_with_log "Python3 venv/ensurepip is missing."
+        fi
+      else
+        err_with_log "Python3 venv is missing. Install Python3 (with venv) and rerun."
+      fi
+    fi
+    return 0
+  fi
+
+  if is_linux; then
+    local pm
+    pm="$(detect_pkg_manager)" || err "Unsupported Linux distro. Install Python3 manually."
+
+    if ! need_cmd python3; then
+      case "${pm}" in
+        apt) install_pkgs_linux "${pm}" python3 ;;
+        dnf|yum|apk|zypper|xbps) install_pkgs_linux "${pm}" python3 ;;
+        pacman) install_pkgs_linux "${pm}" python ;;
+        emerge) install_pkgs_linux "${pm}" dev-lang/python ;;
+        *) err "Unsupported Linux distro. Install Python3 manually." ;;
+      esac
+    fi
+
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+      if run_quiet python3 -m ensurepip --upgrade; then
+        true
+      else
+        case "${pm}" in
+          apt) install_pkgs_linux "${pm}" python3-pip ;;
+          dnf|yum|zypper|xbps) install_pkgs_linux "${pm}" python3-pip ;;
+          pacman) install_pkgs_linux "${pm}" python-pip ;;
+          apk) install_pkgs_linux "${pm}" py3-pip ;;
+          emerge) install_pkgs_linux "${pm}" dev-python/pip ;;
+          *) err "Unsupported Linux distro. Install pip manually." ;;
+        esac
+      fi
+    fi
+
+    if ! python3 - <<'PY' >/dev/null 2>&1
+import ensurepip, venv
+PY
+    then
+      case "${pm}" in
+        apt) install_pkgs_linux "${pm}" python3-venv ;;
+        dnf|yum) install_pkgs_linux "${pm}" python3-virtualenv ;;
+        pacman) install_pkgs_linux "${pm}" python-virtualenv ;;
+        apk) install_pkgs_linux "${pm}" py3-virtualenv ;;
+        zypper|xbps) install_pkgs_linux "${pm}" python3-virtualenv ;;
+        emerge) install_pkgs_linux "${pm}" dev-python/virtualenv ;;
+        *) err "Unsupported Linux distro. Install python venv manually." ;;
+      esac
+    fi
+
+    if ! python3 - <<'PY' >/dev/null 2>&1
+import ensurepip, venv
+PY
+    then
+      err_with_log "Python3 venv/ensurepip is still unavailable after installing dependencies."
+    fi
+    return 0
+  fi
+
+  err "Unsupported OS. Python3 is required to install the Gimble runtime."
+}
+
+setup_python_runtime() {
+  local srcdir="$1"
+  local setup_script="${srcdir}/python/setup_runtime.sh"
+  if [[ ! -f "${setup_script}" ]]; then
+    err "missing runtime setup script: ${setup_script}"
+  fi
+
+  if run_quiet sh "${setup_script}"; then
+    return 0
+  fi
+
+  local base_dir
+  if is_darwin; then
+    base_dir="${HOME}/Library/Application Support/gimble"
+  else
+    base_dir="${HOME}/.config/gimble"
+  fi
+  local venv_dir="${base_dir}/pyenv"
+
+  if ! run_quiet mkdir -p "${base_dir}"; then
+    err_with_log "Failed to create Gimble runtime directory."
+  fi
+  if ! run_quiet python3 -m venv "${venv_dir}"; then
+    err_with_log "Failed to create Gimble Python venv."
+  fi
+  if ! run_quiet "${venv_dir}/bin/python3" -m pip install --upgrade pip; then
+    err_with_log "Failed to upgrade pip in Gimble venv."
+  fi
+  if ! run_quiet "${venv_dir}/bin/python3" -m pip install -r "${srcdir}/python/requirements-core.txt"; then
+    err_with_log "Failed to install Gimble Python runtime requirements."
+  fi
 }
 
 install_python_assets() {
@@ -171,9 +421,12 @@ main() {
 
   install_binary "${tmpdir}/gimble"
   install_python_assets "${srcdir}"
+  ensure_python_runtime
+  setup_python_runtime "${srcdir}"
 
   log "Installed version: $(gimble --version || true)"
   log "Next: run 'gimble'"
+  cleanup_log
 }
 
 main "$@"
