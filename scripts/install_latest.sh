@@ -208,18 +208,18 @@ go_version_ok() {
 
 go_os_arch() {
   local os arch
-  os="$(uname -s 2>/dev/null | tr -d '\r' | xargs)" || return 1
+  os="$(uname -s 2>/dev/null | tr -d '\r\n')" || return 1
   case "${os}" in
     Darwin) os="darwin" ;;
     Linux) os="linux" ;;
     *) return 1 ;;
   esac
-  arch="$(uname -m 2>/dev/null | tr -d '\r' | xargs)" || return 1
+  arch="$(uname -m 2>/dev/null | tr -d '\r\n')" || return 1
   case "${arch}" in
-    x86_64|amd64) arch="amd64" ;;
-    aarch64|arm64) arch="arm64" ;;
-    i386|i686) arch="386" ;;
-    armv6l|armv7l) arch="armv6l" ;;
+    *x86_64*|*amd64*) arch="amd64" ;;
+    *aarch64*|*arm64*) arch="arm64" ;;
+    *i386*|*i686*) arch="386" ;;
+    *armv6l*|*armv7l*) arch="armv6l" ;;
     *) return 1 ;;
   esac
   printf "%s %s" "${os}" "${arch}"
@@ -242,7 +242,26 @@ install_go_tarball() {
   ensure_sudo
 
   local os arch tmp json_file info_file filename sha url actual
-  read -r os arch < <(go_os_arch) || err "Unsupported OS/arch for Go install (expected darwin/linux + amd64/arm64)."
+  if ! read -r os arch < <(go_os_arch); then
+    local raw_os raw_arch
+    raw_os="$(uname -s 2>/dev/null | tr -d '\r\n')"
+    raw_arch="$(uname -m 2>/dev/null | tr -d '\r\n')"
+    case "${raw_os}" in
+      Darwin) os="darwin" ;;
+      Linux) os="linux" ;;
+      *) os="" ;;
+    esac
+    case "${raw_arch}" in
+      *x86_64*|*amd64*) arch="amd64" ;;
+      *aarch64*|*arm64*) arch="arm64" ;;
+      *i386*|*i686*) arch="386" ;;
+      *armv6l*|*armv7l*) arch="armv6l" ;;
+      *) arch="" ;;
+    esac
+    if [[ -z "${os}" || -z "${arch}" ]]; then
+      err "Unsupported OS/arch for Go install (uname -s='${raw_os}' uname -m='${raw_arch}')."
+    fi
+  fi
 
   tmp="$(mktemp -d)"
   json_file="${tmp}/go.json"
