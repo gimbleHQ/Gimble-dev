@@ -5,6 +5,7 @@ REPO="${GIMBLE_REPO:-gimbleHQ/Gimble-dev}"
 API_BASE="https://api.github.com/repos/${REPO}"
 
 LOG_FILE=""
+RUNTIME_PY="python3"
 
 log() { printf "%s\n" "$*"; }
 err() { printf "ERROR: %s\n" "$*" >&2; exit 1; }
@@ -48,10 +49,11 @@ is_linux() {
 }
 
 python_venv_ok() {
+  local py="${1:-python3}"
   local tmp
   tmp="$(mktemp -d)"
-  if run_quiet python3 -m venv "${tmp}/venv"; then
-    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+  if run_quiet "${py}" -m venv "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python" -m pip --version; then
       rm -rf "${tmp}"
       return 0
     fi
@@ -61,10 +63,11 @@ python_venv_ok() {
 }
 
 python_virtualenv_ok() {
+  local py="${1:-python3}"
   local tmp
   tmp="$(mktemp -d)"
-  if run_quiet python3 -m virtualenv "${tmp}/venv"; then
-    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+  if run_quiet "${py}" -m virtualenv "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python" -m pip --version; then
       rm -rf "${tmp}"
       return 0
     fi
@@ -74,10 +77,11 @@ python_virtualenv_ok() {
 }
 
 python_virtualenv_ok_download() {
+  local py="${1:-python3}"
   local tmp
   tmp="$(mktemp -d)"
-  if run_quiet python3 -m virtualenv --download "${tmp}/venv"; then
-    if run_quiet "${tmp}/venv/bin/python3" -m pip --version; then
+  if run_quiet "${py}" -m virtualenv --download "${tmp}/venv"; then
+    if run_quiet "${tmp}/venv/bin/python" -m pip --version; then
       rm -rf "${tmp}"
       return 0
     fi
@@ -91,6 +95,37 @@ python_version_minor() {
 import sys
 print(f"{sys.version_info[0]}.{sys.version_info[1]}")
 PY
+}
+
+select_runtime_python() {
+  local candidates=()
+  local py
+  candidates+=(python3)
+  for v in 3.12 3.11 3.10 3.9 3.8; do
+    candidates+=("python${v}")
+  done
+
+  for py in "${candidates[@]}"; do
+    if ! need_cmd "${py}"; then
+      continue
+    fi
+    if python_venv_ok "${py}"; then
+      RUNTIME_PY="${py}"
+      return 0
+    fi
+  done
+
+  for py in "${candidates[@]}"; do
+    if ! need_cmd "${py}"; then
+      continue
+    fi
+    if python_virtualenv_ok "${py}" || python_virtualenv_ok_download "${py}"; then
+      RUNTIME_PY="${py}"
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 SUDO_CMD=()
@@ -326,7 +361,7 @@ ensure_python_runtime() {
       install_pkgs_linux_best_effort "${pm}" "python${py_ver}-venv" "python${py_ver}-distutils" "python${py_ver}-dev"
     fi
 
-    if python_venv_ok; then
+    if select_runtime_python; then
       return 0
     fi
 
@@ -338,7 +373,7 @@ ensure_python_runtime() {
       err_with_log "Python3 venv is missing. Install Python3 (with venv) and rerun."
     fi
 
-    if python_venv_ok; then
+    if select_runtime_python; then
       return 0
     fi
 
@@ -374,7 +409,7 @@ ensure_python_runtime() {
       fi
     fi
 
-    if python_venv_ok; then
+    if select_runtime_python; then
       return 0
     fi
 
@@ -388,7 +423,7 @@ ensure_python_runtime() {
       *) err "Unsupported Linux distro. Install python venv manually." ;;
     esac
 
-    if python_venv_ok; then
+    if select_runtime_python; then
       return 0
     fi
 
@@ -401,7 +436,7 @@ ensure_python_runtime() {
       *) true ;;
     esac
 
-    if python_virtualenv_ok || python_virtualenv_ok_download; then
+    if select_runtime_python; then
       return 0
     fi
 
@@ -434,8 +469,9 @@ setup_python_runtime() {
   if ! run_quiet mkdir -p "${base_dir}"; then
     err_with_log "Failed to create Gimble runtime directory."
   fi
-  if ! run_quiet python3 -m venv "${venv_dir}"; then
-    if run_quiet python3 -m virtualenv --download "${venv_dir}" || run_quiet python3 -m virtualenv "${venv_dir}"; then
+  local py="${RUNTIME_PY:-python3}"
+  if ! run_quiet "${py}" -m venv "${venv_dir}"; then
+    if run_quiet "${py}" -m virtualenv --download "${venv_dir}" || run_quiet "${py}" -m virtualenv "${venv_dir}"; then
       true
     else
       err_with_log "Failed to create Gimble Python venv."
