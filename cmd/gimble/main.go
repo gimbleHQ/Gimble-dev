@@ -602,9 +602,9 @@ func installPythonRuntimeDuringSetup() error {
 func printSetupBanner() {
 	border := "=============================================================="
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;35"))
+	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;36"))
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println("Gimble.dev configuration wizard")
+	fmt.Println("Gimble CLI Configuration Wizard")
 	fmt.Println()
 }
 
