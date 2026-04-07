@@ -499,7 +499,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 		fmt.Println(styleText(line, "1;35"))
 	}
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println(styleText("Deployment Intelligence for Robotics", "1;37"))
+	fmt.Println(styleText("Observability for Systems", "1;37"))
 	fmt.Println()
 
 	if activeName != "" {
@@ -508,8 +508,8 @@ func printSessionIntro(activeName string, p profile.Profile) {
 		fmt.Println()
 	}
 
-	fmt.Println("Gimble helps you debug deployment failures, inspect runtime behavior,")
-	fmt.Println("and trace issues across code, infrastructure, and robots in the field.")
+	fmt.Println("Gimble helps you debug incidents, inspect runtime behavior,")
+	fmt.Println("and correlate signals across logs, metrics, traces, and deploys.")
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat          Start Gimble Cloud session + log uploader")
@@ -518,12 +518,12 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println("  gim exit          Leave Gimble session")
 	fmt.Println()
 	fmt.Println(styleText("Try Asking", "1;33"))
-	fmt.Println("  > why did the perception pipeline crash?")
-	fmt.Println("  > analyze latest ros logs")
-	fmt.Println("  > inspect GPU usage on robot-03")
-	fmt.Println("  > investigate deployment failures")
+	fmt.Println("  > summarize errors since the last deploy")
+	fmt.Println("  > correlate latency spikes with recent changes")
+	fmt.Println("  > inspect service health across environments")
+	fmt.Println("  > investigate a failed rollout")
 	fmt.Println()
-	fmt.Println("Diagnose logs, ask a question, or connect a robot.")
+	fmt.Println("Diagnose logs, ask a question, or connect telemetry.")
 	fmt.Println()
 }
 
