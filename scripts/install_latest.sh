@@ -136,6 +136,23 @@ ensure_virtualenv_module() {
   return 1
 }
 
+ensure_system_venv_pkg() {
+  if ! is_linux; then
+    return 1
+  fi
+  local pm
+  pm="$(detect_pkg_manager)" || return 1
+  case "${pm}" in
+    apt) install_pkgs_linux "${pm}" python3-venv ;;
+    dnf|yum|zypper|xbps) install_pkgs_linux "${pm}" python3-virtualenv ;;
+    pacman) install_pkgs_linux "${pm}" python-virtualenv ;;
+    apk) install_pkgs_linux "${pm}" py3-virtualenv ;;
+    emerge) install_pkgs_linux "${pm}" dev-python/virtualenv ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
 select_runtime_python() {
   local candidates=()
   local py
@@ -751,6 +768,7 @@ setup_python_runtime() {
     rm -rf "${venv_dir}" || true
   fi
   if ! run_quiet "${py}" -m venv "${venv_dir}"; then
+    ensure_system_venv_pkg || true
     ensure_virtualenv_module "${py}" || true
   fi
   if ! run_quiet "${py}" -m venv "${venv_dir}"; then
