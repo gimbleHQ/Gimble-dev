@@ -619,10 +619,9 @@ func runSetupWizard() error {
 
 	printSetupBanner()
 	printSetupSection("Privacy Policy")
-	fmt.Println("By entering/accepting or saying yes [y], you agree to Gimble's Data Sharing and Privacy Policy.")
-	fmt.Println("You can read it here: /docs/privacy_policy.md")
+	fmt.Println("By entering or saying yes [y], you agree to Gimble's Data Sharing and Privacy Policy.")
+	fmt.Printf("You can read it here: %s\n", styleText("https://github.com/gimbleHQ/Gimble-dev/blob/main/docs/privacy_policy.md", "1;34"))
 	fmt.Println()
-	printSetupSection("Profile")
 
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
@@ -641,7 +640,9 @@ func runSetupWizard() error {
 		return fmt.Errorf("privacy policy consent not accepted; setup aborted")
 	}
 
-	name, err := promptRequired(reader, "User name")
+	fmt.Println()
+	printSetupSection("Profile")
+	name, err := promptRequired(reader, "User Name")
 	if err != nil {
 		return err
 	}
@@ -691,7 +692,7 @@ func runSetupWizard() error {
 
 	fmt.Println()
 	printSetupSection("Model Providers")
-	fmt.Println("Get an OpenAI API key at https://platform.openai.com/api-keys")
+	fmt.Printf("Get an OpenAI API key at %s\n", styleText("https://platform.openai.com/api-keys", "1;34"))
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
 		return err
@@ -702,7 +703,7 @@ func runSetupWizard() error {
 	nebiusKey := ""
 	if openAIKey == "" {
 		fmt.Println()
-		fmt.Println("Get a Groq API key at https://console.groq.com/keys")
+		fmt.Printf("Get a Groq API key at %s\n", styleText("https://console.groq.com/keys", "1;34"))
 		groqKey, err = promptOptional(reader, "Groq API key (press Enter to skip)")
 		if err != nil {
 			return err
@@ -711,7 +712,7 @@ func runSetupWizard() error {
 	}
 	if openAIKey == "" && groqKey == "" {
 		fmt.Println()
-		fmt.Println("Get a Nebius API key at https://console.nebius.com/")
+		fmt.Printf("Get a Nebius API key at %s\n", styleText("https://console.nebius.com/", "1;34"))
 		nebiusKey, err = promptOptional(reader, "Nebius API key (press Enter to skip)")
 		if err != nil {
 			return err

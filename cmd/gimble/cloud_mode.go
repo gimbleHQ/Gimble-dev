@@ -212,10 +212,11 @@ func googleDeviceFlow(apiBase, token, userID, username string) error {
 	if err := json.NewDecoder(resp.Body).Decode(&start); err != nil {
 		return err
 	}
-	fmt.Println("\nGoogle sign-in required for additional security.")
 	fmt.Println()
-	fmt.Printf("Open: %s\n", start.VerificationURL)
-	fmt.Printf("Enter code: %s\n\n", start.UserCode)
+	printSetupSection("Device Verification")
+	fmt.Println("Google sign-in required for additional security.")
+	fmt.Printf("Verify your device at: %s\n", styleText(start.VerificationURL, "1;34"))
+	fmt.Printf("Enter code: %s\n\n", styleText(start.UserCode, "1;32"))
 
 	pollEndpoint := strings.TrimRight(apiBase, "/") + "/v1/auth/google/poll"
 	deadline := time.Now().Add(time.Duration(start.ExpiresIn) * time.Second)
