@@ -602,7 +602,7 @@ func installPythonRuntimeDuringSetup() error {
 func printSetupBanner() {
 	border := "=============================================================="
 	fmt.Println(styleText(border, "1;36"))
-	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;36"))
+	fmt.Println(styleText("GIMBLE INITIAL SETUP", "1;35"))
 	fmt.Println(styleText(border, "1;36"))
 	fmt.Println("Gimble CLI Configuration Wizard")
 	fmt.Println()
@@ -620,7 +620,7 @@ func runSetupWizard() error {
 	printSetupBanner()
 	printSetupSection("Privacy Policy")
 	fmt.Println("By entering or saying yes [y], you agree to Gimble's Data Sharing and Privacy Policy.")
-	fmt.Printf("You can read it here: %s\n", styleText("https://github.com/gimbleHQ/Gimble-dev/blob/main/docs/privacy_policy.md", "1;34"))
+	fmt.Printf("You can read it here: %s\n", styleText("https://github.com/gimbleHQ/Gimble-dev/blob/main/docs/privacy_policy.md", "1;35"))
 	fmt.Println()
 
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
@@ -692,7 +692,7 @@ func runSetupWizard() error {
 
 	fmt.Println()
 	printSetupSection("Model Providers")
-	fmt.Printf("Get an OpenAI API key at %s\n", styleText("https://platform.openai.com/api-keys", "1;34"))
+	fmt.Printf("Get an OpenAI API key at %s\n", styleText("https://platform.openai.com/api-keys", "1;35"))
 	openAIKey, err := promptOptional(reader, "OpenAI API key (press Enter to skip)")
 	if err != nil {
 		return err
@@ -703,7 +703,7 @@ func runSetupWizard() error {
 	nebiusKey := ""
 	if openAIKey == "" {
 		fmt.Println()
-		fmt.Printf("Get a Groq API key at %s\n", styleText("https://console.groq.com/keys", "1;34"))
+		fmt.Printf("Get a Groq API key at %s\n", styleText("https://console.groq.com/keys", "1;35"))
 		groqKey, err = promptOptional(reader, "Groq API key (press Enter to skip)")
 		if err != nil {
 			return err
@@ -712,7 +712,7 @@ func runSetupWizard() error {
 	}
 	if openAIKey == "" && groqKey == "" {
 		fmt.Println()
-		fmt.Printf("Get a Nebius API key at %s\n", styleText("https://console.nebius.com/", "1;34"))
+		fmt.Printf("Get a Nebius API key at %s\n", styleText("https://console.nebius.com/", "1;35"))
 		nebiusKey, err = promptOptional(reader, "Nebius API key (press Enter to skip)")
 		if err != nil {
 			return err
