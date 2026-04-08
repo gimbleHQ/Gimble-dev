@@ -512,7 +512,7 @@ func printSessionIntro(activeName string, p profile.Profile) {
 	fmt.Println("logs, traces, and deployments—so you can see what actually happened.")
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
-	fmt.Printf("  %s          Start Gimble Cloud session + log uploader\n", styleText("gim chat", "1;35"))
+	fmt.Printf("  %s          Start Gimble Cloud session + log uploader %s\n", styleText("gim chat", "1;35"), styleText("[do this]", "1;35"))
 	fmt.Println("  gim profile       Show active profile details")
 	fmt.Println("  gim keys          Update OpenAI/Groq/Nebius API keys")
 	fmt.Println("  gim exit          Leave Gimble session")
