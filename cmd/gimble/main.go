@@ -508,8 +508,8 @@ func printSessionIntro(activeName string, p profile.Profile) {
 		fmt.Println()
 	}
 
-	fmt.Println("Gimble helps you debug incidents, inspect runtime behavior,")
-	fmt.Println("and correlate signals across logs, metrics, traces, and deploys.")
+	fmt.Println("Gimble helps you debug incidents by connecting runtime behavior across")
+	fmt.Println("logs, traces, and deployments—so you can see what actually happened.")
 	fmt.Println()
 	fmt.Println(styleText("Function", "1;33"))
 	fmt.Println("  gim chat          Start Gimble Cloud session + log uploader")
