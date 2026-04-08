@@ -1,0 +1,51 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Wed, 08 Apr 2026 19:55:24 +0000
+Description: gimble apt repository
+Label: gimble
+Origin: gimble
+Suite: stable
+MD5Sum:
+ b391f7c4a470e2275a8bd252cf185281              177 Release
+ 3d80cdd5b0553436da100f7c2e1fa525              436 main/binary-amd64/Packages
+ 41df823a8c29e670c9216cacd2e8cf31              338 main/binary-amd64/Packages.gz
+ d6039a77233e34a60067ee8070fff580              436 main/binary-arm64/Packages
+ 0aeebbaa06d2f7381c8968a2626bac31              339 main/binary-arm64/Packages.gz
+SHA1:
+ 09939b67382a07ac7b2f8aa057d4f5e819ade9e6              177 Release
+ 0f135b08b765eb2d086d124de1f81f57cbd1d0c5              436 main/binary-amd64/Packages
+ 2a1e8c4498f646d0b650be5d8632b06b351d24bd              338 main/binary-amd64/Packages.gz
+ 29a6ac3453c9795a923b83a536dfd881f6c8bfcc              436 main/binary-arm64/Packages
+ 9417b9dd4e716d5104613ef577f02e70636041f2              339 main/binary-arm64/Packages.gz
+SHA256:
+ 5d73c5efa786a9f76437292d80dc9e1a7850be8db8af0b75758aa769de937bdc              177 Release
+ d6d901fbbfb8bacfc4d289bc1e8fb716eec7d946128d660830b6151381710a10              436 main/binary-amd64/Packages
+ e243885ea86b8de6410f3d2e6e01f36545086d5d2fa2414c4c785ee8fa6b2d20              338 main/binary-amd64/Packages.gz
+ bd1a7424f611bb0ac21572ba21ab2ffbdb06c3e62c5fd484ee333bf7418ff5ae              436 main/binary-arm64/Packages
+ 6a939ffc018fd0447f0b8b6bdadaa1e47690f1af73317718d5dad1b83aa0246c              339 main/binary-arm64/Packages.gz
+SHA512:
+ 90644b2dcfb68f3f141f508edd8c6e43bd6fb0e0c734e3dd4990ed36cdb9550c02a158578959a69c15ab1abd0f8f0422b66708c643b10f2ed769d4c287e6ca36              177 Release
+ 4720db2f902d2f6b39c31be30fc9d1af98f49a05ceb637ebe7ea4607690dcca1bdc1ee5def194b88151034b7abeaf8bfbbacdedea6b8f3f227d277196d93b798              436 main/binary-amd64/Packages
+ 1254a60483b77975015ae3c233280f13957d407d0bd1180a301b601934fb6fa1fc2de51d3b932f8d0eea073f5fd8f1a27b1c6e068f71a830f7eeda06cb2017d6              338 main/binary-amd64/Packages.gz
+ fb44ead2c4ed494c63d078c32adf4945d56456f2b93759dcaa5fe8c4c0d65d52ddf02ca43651d95346273e491198ae003dcbc6f4ed8a1e907214fe24cd36c605              436 main/binary-arm64/Packages
+ 3dd5ecdc6431031fee67487af4f158f7908b636f656b2baa2175d6b09ba4f34333f37cfb9a163f19a8cf9d35f64a725565b83a84e0d67987740bf575fc80e960              339 main/binary-arm64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEElp6KRcAJwolMf/XnNsPhD06TXr4FAmnWsq0ACgkQNsPhD06T
+Xr7uARAAoU7yz8TR4Ik6lKmuQn+aRWwiBSje01x1ARlxLXFbkT6cTBEiLTzyMSM8
+cxeAUq7+k2YFPmX7IPZEhlVMRjFUk9J1Ezui42J77XxKGy5EoI8S56P9OuBxbpCb
+sZyjzIsPuvsNFCy8JidDw/b09x7nVxVwQ4cGtQE1ZFLO20RPFpYsuy4ffYCSwIWU
+bVI3had5AmA4JsGT77osaqkrHer2GZbNjeoVHXRR0qS3cX+tlTPKHdWGGqV4sG9D
+HJifuF1oDL8YTQB6RuhPu+JmBJpZB6E8BgCF6GAqKGgSEMcD1WZ7wZ5h6d/QTE0o
+uFdaZYMr0Mh2cecndXTQwOxbVHG2vLFPACZp3rDN6T0F/pVt/iwLvE1zn5rNr2/h
++OgDAhpOfrriIvPbXfSORNh06WBMQbVueIrnqftoERBJinE8j6jf1tMk9/CQ6DF2
+VjKZDO6hpzBtg50e/C4YjnVRPCIaHFc2aZTxpotfC69lzAaxnHnJPBY0eryVHw2I
+OtI4dcfyuqL7d0VIYMTCGLlurflFhmDCtt2+6/gsRCZxxcix1N05+ubs3AVENYWN
+x7X57v6D+huY2E0gjZFxnUxzbgKqZruweTMPWA5WINW6lzM6usMG/waNW7n8zZO6
+WazL49PSakVgg5fA0oNZVYxEPvIQtj12us5cnWPmtOEmsOVtKyk=
+=TBiH
+-----END PGP SIGNATURE-----

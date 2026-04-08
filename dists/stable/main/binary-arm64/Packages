@@ -1,0 +1,15 @@
+Package: gimble
+Version: 1.0.0
+Architecture: arm64
+Maintainer: Gimble Team <dev@gimble.dev>
+Depends: python3, python3-venv
+Filename: pool/main/g/gimble/gimble_1.0.0_arm64.deb
+Size: 3959914
+MD5sum: de638f3d94aa324b5d297de73eb146ae
+SHA1: d723773970f51d512f7460d24f4c8701bddca3d7
+SHA256: 96a498806e71442eddc677ffd56a58bf3655308692e543f9e77f67e58d3cab7a
+Section: utils
+Priority: optional
+Description: Gimble CLI
+ Gimble command-line tool.
+
