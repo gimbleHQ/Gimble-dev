@@ -335,7 +335,7 @@ func createCloudSession(apiBase, token, userID, username string, sessionConfig m
 
 func runCloudChat() error {
 	if existingURL := activeChatPublicURL(); existingURL != "" {
-		fmt.Printf("Gimble Chat Agent is already running. Reuse this live link: %s\n", makeHyperlink(existingURL))
+		fmt.Printf("Gimble Chat Agent is already running. Reuse this live link: %s\n", styleText(makeHyperlink(existingURL), "1;35"))
 		return nil
 	}
 	if err := stopAndClearChatServer(); err != nil {
@@ -424,6 +424,6 @@ func runCloudChat() error {
 	}
 
 	fmt.Println("✓ Starting Gimble cloud session")
-	fmt.Printf("Chat with Gimble Agents at: %s\n", makeHyperlink(sess.PublicURL))
+	fmt.Printf("Chat with Gimble Agents at: %s\n", styleText(makeHyperlink(sess.PublicURL), "1;35"))
 	return nil
 }
